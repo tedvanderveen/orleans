@@ -855,6 +855,23 @@ namespace Orleans.Runtime
         }
 
         #endregion
+
+        bool IEquatable<ISchedulingContext>.Equals(ISchedulingContext other)
+        {
+            var otherActivation = other as ActivationData;
+            return otherActivation != null && this.ActivationId.Key.Equals(otherActivation.ActivationId.Key);
+        }
+
+        SchedulingContextType ISchedulingContext.ContextType => SchedulingContextType.Activation;
+
+        bool ISchedulingContext.IsSystemPriorityContext => false;
+
+        string ISchedulingContext.DetailedStatus() => this.ToDetailedString(true);
+
+        public override int GetHashCode()
+        {
+            return this.ActivationId.Key.GetHashCode();
+        }
     }
 
     internal static class StreamResourceTestControl

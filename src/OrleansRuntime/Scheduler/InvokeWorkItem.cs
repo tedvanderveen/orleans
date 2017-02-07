@@ -10,12 +10,12 @@ namespace Orleans.Runtime.Scheduler
         private readonly Message message;
         private readonly Dispatcher dispatcher;
 
-        public InvokeWorkItem(ActivationData activation, Message message, ISchedulingContext context, Dispatcher dispatcher)
+        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher)
         {
             this.activation = activation;
             this.message = message;
             this.dispatcher = dispatcher;
-            SchedulingContext = context;
+            SchedulingContext = activation;
             if (activation == null || activation.GrainInstance==null)
             {
                 var str = String.Format("Creating InvokeWorkItem with bad activation: {0}. Message: {1}", activation, message);

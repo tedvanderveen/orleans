@@ -956,19 +956,14 @@ namespace Orleans.Runtime
 
         private void UnobservedExceptionHandler(ISchedulingContext context, Exception exception)
         {
-            var schedulingContext = context as SchedulingContext;
-            if (schedulingContext == null)
+            if (context == null)
             {
-                if (context == null)
-                    logger.Error(ErrorCode.Runtime_Error_100102, "Silo caught an UnobservedException with context==null.", exception);
-                else
-                    logger.Error(ErrorCode.Runtime_Error_100103, String.Format("Silo caught an UnobservedException with context of type different than OrleansContext. The type of the context is {0}. The context is {1}",
-                        context.GetType(), context), exception);
+                logger.Error(ErrorCode.Runtime_Error_100102, "Silo caught an UnobservedException with context==null.", exception);
             }
             else
             {
-                logger.Error(ErrorCode.Runtime_Error_100104, String.Format("Silo caught an UnobservedException thrown by {0}.", schedulingContext.Activation), exception);
-            }   
+                logger.Error(ErrorCode.Runtime_Error_100104, string.Format("Silo caught an UnobservedException thrown by {0}.", context), exception);
+            }
         }
 
         private void DomainUnobservedExceptionHandler(object context, UnhandledExceptionEventArgs args)
@@ -1007,7 +1002,7 @@ namespace Orleans.Runtime
                 Utils.SafeExecute(() =>
                 {
                     var activationData = enumerator.Current.Value;
-                    var workItemGroup = scheduler.GetWorkItemGroup(new SchedulingContext(activationData));
+                    var workItemGroup = scheduler.GetWorkItemGroup(activationData);
                     if (workItemGroup == null)
                     {
                         sb.AppendFormat("Activation with no work item group!! Grain {0}, activation {1}.",

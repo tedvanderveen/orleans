@@ -122,8 +122,7 @@ namespace Orleans.Runtime
             if (!String.IsNullOrEmpty(genericArguments))
                 message.GenericGrainType = genericArguments;
 
-            SchedulingContext schedulingContext = RuntimeContext.Current != null ?
-                RuntimeContext.Current.ActivationContext as SchedulingContext : null;
+            var schedulingContext = RuntimeContext.Current?.ActivationContext;
 
             ActivationData sendingActivation = null;
             if (schedulingContext == null)
@@ -139,18 +138,27 @@ namespace Orleans.Runtime
             {
                 case SchedulingContextType.SystemThread:
                     throw new ArgumentException(
-                        String.Format("Trying to send a message {0} on a silo not from within grain and not from within system target (RuntimeContext is of SchedulingContextType.SystemThread type)", message), "context");
+                        string.Format(
+                            "Trying to send a message {0} on a silo not from within grain and not from within system target (RuntimeContext is of SchedulingContextType.SystemThread type)",
+                            message),
+                        nameof(context));
 
                 case SchedulingContextType.Activation:
-                    message.SendingActivation = schedulingContext.Activation.ActivationId;
-                    message.SendingGrain = schedulingContext.Activation.Grain;
-                    sendingActivation = schedulingContext.Activation;
+                {
+                    var activation = (ActivationData) schedulingContext;
+                    message.SendingActivation = activation.ActivationId;
+                    message.SendingGrain = activation.Grain;
+                    sendingActivation = activation;
                     break;
+                }
 
                 case SchedulingContextType.SystemTarget:
-                    message.SendingActivation = schedulingContext.SystemTarget.ActivationId;
-                    message.SendingGrain = ((ISystemTargetBase)schedulingContext.SystemTarget).GrainId;
+                {
+                    var systemTarget = (SchedulingContext) schedulingContext;
+                    message.SendingActivation = systemTarget.SystemTarget.ActivationId;
+                    message.SendingGrain = ((ISystemTargetBase)systemTarget.SystemTarget).GrainId;
                     break;
+                }
             }
 
             // fill in destination
@@ -621,10 +629,10 @@ namespace Orleans.Runtime
             {
                 if (RuntimeContext.Current == null) return null;
 
-                SchedulingContext context = RuntimeContext.Current.ActivationContext as SchedulingContext;
-                if (context != null && context.Activation != null)
+                var context = RuntimeContext.Current.ActivationContext;
+                if (context != null && context.ContextType == SchedulingContextType.Activation)
                 {
-                    return context.Activation;
+                    return context as IActivationData;
                 }
                 return null;
             }

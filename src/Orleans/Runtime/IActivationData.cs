@@ -5,7 +5,7 @@ using Orleans.Storage;
 namespace Orleans.Runtime
 {
     //TODO: this interface should not meta-data for a grain activation. 
-    internal interface IActivationData
+    internal interface IActivationData : ISchedulingContext
     {
         GrainReference GrainReference { get; }
         GrainId Identity { get; }

@@ -4,22 +4,13 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class SchedulingContext : ISchedulingContext
     {
-        public ActivationData Activation { get; private set; }
+        public SystemTarget SystemTarget { get; }
 
-        public SystemTarget SystemTarget { get; private set; }
+        public int DispatcherTarget { get; }
 
-        public int DispatcherTarget { get; private set; }
-
-        public SchedulingContextType ContextType { get; private set; }
+        public SchedulingContextType ContextType { get; }
 
         private readonly bool isLowPrioritySystemTarget;
-
-        public SchedulingContext(ActivationData activation)
-        {
-            Activation = activation;
-            ContextType = SchedulingContextType.Activation;
-            isLowPrioritySystemTarget = false;
-        }
 
         internal SchedulingContext(SystemTarget systemTarget, bool lowPrioritySystemTarget)
         {
@@ -41,9 +32,6 @@ namespace Orleans.Runtime.Scheduler
             {
                 switch (ContextType)
                 {
-                    case SchedulingContextType.Activation:
-                        return false;
-
                     case SchedulingContextType.SystemTarget:
                         return !isLowPrioritySystemTarget;
 
@@ -75,9 +63,6 @@ namespace Orleans.Runtime.Scheduler
             var other = obj as SchedulingContext;
             switch (ContextType)
             {
-                case SchedulingContextType.Activation:
-                    return other != null && Activation.Equals(other.Activation);
-
                 case SchedulingContextType.SystemTarget:
                     return other != null && SystemTarget.Equals(other.SystemTarget);
 
@@ -93,9 +78,6 @@ namespace Orleans.Runtime.Scheduler
         {
             switch (ContextType)
             {
-                case SchedulingContextType.Activation:
-                    return Activation.ActivationId.Key.GetHashCode();
-
                 case SchedulingContextType.SystemTarget:
                     return SystemTarget.ActivationId.Key.GetHashCode();
 
@@ -111,9 +93,6 @@ namespace Orleans.Runtime.Scheduler
         {
             switch (ContextType)
             {
-                case SchedulingContextType.Activation:
-                    return Activation.ToString();
-
                 case SchedulingContextType.SystemTarget:
                     return SystemTarget.ToString();
 
@@ -128,9 +107,6 @@ namespace Orleans.Runtime.Scheduler
         {
             switch (ContextType)
             {
-                case SchedulingContextType.Activation:
-                    return Activation.ToDetailedString(true);
-
                 case SchedulingContextType.SystemTarget:
                     return SystemTarget.ToDetailedString();
 
@@ -148,9 +124,6 @@ namespace Orleans.Runtime.Scheduler
             {
                 switch (ContextType)
                 {
-                    case SchedulingContextType.Activation:
-                        return Activation.Name;
-
                     case SchedulingContextType.SystemTarget:
                         return ((ISystemTargetBase)SystemTarget).GrainId.ToString();
 
