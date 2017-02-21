@@ -1,6 +1,10 @@
 using System;
+using System.Collections;
+using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -9,6 +13,85 @@ using Orleans.Services;
 
 namespace Orleans.Runtime
 {
+
+    public interface ISiloService : ISystemTarget
+    {
+    }
+
+    public abstract class SiloService : SystemTarget, ISiloService
+    {
+        /// <summary>Constructor to use for grain services</summary>
+        protected SiloService(IGrainIdentity grainId, Silo silo)
+            : base((GrainId) grainId, silo.SiloAddress, lowPriority: true)
+        {
+        }
+
+        public virtual void Init(IServiceProvider serviceProvider)
+        {
+        }
+
+        public virtual Task Start() => TaskDone.Done;
+        public virtual Task Stop() => TaskDone.Done;
+    }
+
+    public interface ISiloServiceResolver
+    {
+        TSiloService[] GetSiloService<TSiloService>() where TSiloService : ISiloService;
+        TSiloService GetSiloService<TSiloService>(SiloAddress siloAddress) where TSiloService : ISiloService;
+    }
+
+    internal class SiloServiceResolver : ISiloServiceResolver, ISiloStatusListener
+    {
+        private readonly IInternalGrainFactory grainFactory;
+        private readonly ISiloStatusOracle siloStatusOracle;
+        private ImmutableDictionary<Type, GrainId> grainIds;
+        private ImmutableArray<SiloAddress> silos;
+
+        public SiloServiceResolver(IInternalGrainFactory grainFactory, ISiloStatusOracle siloStatusOracle)
+        {
+            this.grainFactory = grainFactory;
+            this.siloStatusOracle = siloStatusOracle;
+            this.siloStatusOracle.SubscribeToSiloStatusEvents(this);
+            this.silos = new ImmutableArray<SiloAddress>().AddRange(siloStatusOracle.GetApproximateSiloStatuses(true).Keys);
+            this.grainIds = ImmutableDictionary<Type, GrainId>.Empty;
+        }
+
+        public TSiloService[] GetSiloService<TSiloService>() where TSiloService : ISiloService
+        {
+            var currentSilos = this.silos;
+            var result = new TSiloService[currentSilos.Length];
+            var grainId = this.GetGrainId(typeof(TSiloService));
+            for (var i = 0; i < currentSilos.Length; i++)
+            {
+                result[i] = this.grainFactory.GetSystemTarget<TSiloService>(grainId, currentSilos[i]);
+            }
+
+            return result;
+        }
+
+        public TSiloService GetSiloService<TSiloService>(SiloAddress siloAddress) where TSiloService : ISiloService
+        {
+            return this.grainFactory.GetSystemTarget<TSiloService>(this.GetGrainId(typeof(TSiloService)), siloAddress);
+        }
+
+        void ISiloStatusListener.SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        {
+            // Ignore the particular update and refresh the entire list.
+            this.silos = new ImmutableArray<SiloAddress>().AddRange(this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys);
+        }
+
+        private GrainId GetGrainId(Type serviceType)
+        {
+            GrainId result;
+            if (this.grainIds.TryGetValue(serviceType, out result)) return result;
+           
+            var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(serviceType);
+            result = GrainId.GetGrainServiceGrainId(0, typeCode);
+            this.grainIds = this.grainIds.Add(serviceType, result);
+            return result;
+        }
+    }
+
     /// <summary>Base class for implementing a grain-like partitioned service with per silo instances of it automatically instantiated and started by silo runtime</summary>
     public abstract class GrainService : SystemTarget, IRingRangeListener, IGrainService
     {
