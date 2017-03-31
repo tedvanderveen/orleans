@@ -88,7 +88,7 @@ namespace Orleans.Serialization
         private Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
         private Dictionary<RuntimeTypeHandle, Serializer> serializers;
         private Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
-        private ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
+        private CachedReadConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
         private readonly IExternalSerializer fallbackSerializer;
         private LoggerImpl logger;
@@ -219,7 +219,7 @@ namespace Orleans.Serialization
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
-            grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
+            grainRefConstructorDictionary = new CachedReadConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
             logger = LogManager.GetLogger("SerializationManager", LoggerType.Runtime);
 
             // Built-in handlers: Tuples
@@ -746,6 +746,7 @@ namespace Orleans.Serialization
             }
 
             var defaultCtorDelegate = CreateGrainRefConstructorDelegate(type, null);
+            var interner = new Interner<GrainReference, GrainReference>();
 
             // Register GrainReference serialization methods.
             Register(
@@ -756,9 +757,14 @@ namespace Orleans.Serialization
                 {
                     Func<GrainReference, GrainReference> ctorDelegate;
                     var deserialized = (GrainReference)GrainReference.DeserializeGrainReference(expected, context);
+
+                    GrainReference result;
+                    if (interner.TryFind(deserialized, out result)) return result;
+
                     if (expected.IsConstructedGenericType == false)
                     {
-                        return defaultCtorDelegate(deserialized);
+                        result = defaultCtorDelegate(deserialized);
+                        return interner.Intern(result, result);
                     }
 
                     if (!grainRefConstructorDictionary.TryGetValue(expected, out ctorDelegate))
@@ -767,7 +773,8 @@ namespace Orleans.Serialization
                         grainRefConstructorDictionary.TryAdd(expected, ctorDelegate);
                     }
 
-                    return ctorDelegate(deserialized);
+                    result = ctorDelegate(deserialized);
+                    return interner.Intern(result, result);
                 });
         }
 
