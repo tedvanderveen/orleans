@@ -130,6 +130,43 @@ namespace Orleans
         /// Find cached copy of object with specified key, otherwise create new one using the supplied creator-function.
         /// </summary>
         /// <param name="key">key to find</param>
+        /// <param name="creatorFunc">function to create new object and store for this key if no cached copy exists</param>
+        /// <param name="state">The state passed to the creator func.</param>
+        /// <returns>Object with specified key - either previous cached copy or newly created</returns>
+        public T FindOrCreate<TState>(K key, Func<K, TState, T> creatorFunc, TState state)
+        {
+            T result;
+            WeakReference<T> cacheEntry;
+
+            // Attempt to get the existing value from cache.
+            internCache.TryGetValue(key, out cacheEntry);
+
+            // If no cache entry exists, create and insert a new one using the creator function.
+            if (cacheEntry == null)
+            {
+                result = creatorFunc(key, state);
+                cacheEntry = new WeakReference<T>(result);
+                internCache[key] = cacheEntry;
+                return result;
+            }
+
+            // If a cache entry did exist, determine if it still holds a valid value.
+            cacheEntry.TryGetTarget(out result);
+            if (result == null)
+            {
+                // Create new object and ensure the entry is still valid by re-inserting it into the cache.
+                result = creatorFunc(key, state);
+                cacheEntry.SetTarget(result);
+                internCache[key] = cacheEntry;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Find cached copy of object with specified key, otherwise create new one using the supplied creator-function.
+        /// </summary>
+        /// <param name="key">key to find</param>
         /// <param name="obj">The existing value if the key is found</param>
         public bool TryFind(K key, out T obj)
         {
@@ -146,7 +183,7 @@ namespace Orleans
         /// <returns>Object with specified key - either previous cached copy or justed passed in</returns>
         public T Intern(K key, T obj)
         {
-            return FindOrCreate(key, _ => obj);
+            return FindOrCreate(key, (k, state) => state, obj);
         }
 
         public void StopAndClear()
