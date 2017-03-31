@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Utilities;
 
 namespace Orleans
 {
@@ -13,6 +14,17 @@ namespace Orleans
     /// </summary>
     internal class GrainFactory : IInternalGrainFactory, IGrainReferenceConverter
     {
+        /// <summary>
+        /// Creates a grain reference for the provided grain interface type and grain id.
+        /// </summary>
+        private readonly Func<GrainId, Type, object> createTypedGrainReference;
+
+        /// <summary>
+        /// Mapping from grain interface type to cache of grain references of that type.
+        /// </summary>
+        private readonly CachedReadConcurrentDictionary<Type, Interner<GrainId, object>> grainReferenceCache =
+            new CachedReadConcurrentDictionary<Type, Interner<GrainId, object>>();
+
         /// <summary>
         /// The mapping between concrete grain interface types and delegate
         /// </summary>
@@ -41,12 +53,19 @@ namespace Orleans
         /// </summary>
         private readonly IRuntimeClient runtimeClient;
 
+        /// <summary>
+        /// Creates a grain reference caster for the provided interface type.
+        /// </summary>
+        private readonly Func<Type, GrainReferenceCaster> makeCaster;
+
         // Make this internal so that client code is forced to access the IGrainFactory using the 
         // GrainClient (to make sure they don't forget to initialize the client).
         public GrainFactory(IRuntimeClient runtimeClient, TypeMetadataCache typeCache)
         {
             this.runtimeClient = runtimeClient;
             this.typeCache = typeCache;
+            this.createTypedGrainReference = (id, type) => this.Cast(this.MakeGrainReferenceFromType(type, id), type);
+            this.makeCaster = this.MakeCaster;
         }
 
         /// <summary>
@@ -68,7 +87,7 @@ namespace Orleans
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
             var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            return (TGrainInterface)this.GetGrainReference(grainId, interfaceType);
         }
 
         /// <summary>
@@ -83,7 +102,7 @@ namespace Orleans
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
             var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            return (TGrainInterface)this.GetGrainReference(grainId, interfaceType);
         }
 
         /// <summary>
@@ -99,7 +118,7 @@ namespace Orleans
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
             var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            return (TGrainInterface)this.GetGrainReference(grainId, interfaceType);
         }
 
         /// <summary>
@@ -118,7 +137,7 @@ namespace Orleans
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
             var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            return (TGrainInterface)this.GetGrainReference(grainId, interfaceType);
         }
 
         /// <summary>
@@ -137,7 +156,7 @@ namespace Orleans
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
             var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            return (TGrainInterface)this.GetGrainReference(grainId, interfaceType);
         }
 
         /// <inheritdoc />
@@ -248,6 +267,40 @@ namespace Orleans
             return implementation;
         }
 
+        private Interner<GrainId, object> GetGrainReferenceInterner(Type type)
+        {
+            Interner<GrainId, object> result;
+            if (this.grainReferenceCache.TryGetValue(type, out result)) return result;
+
+            // Attempt to add a new interner, but return whatever interner is actually set.
+            this.grainReferenceCache.TryAdd(type, new Interner<GrainId, object>());
+            this.grainReferenceCache.TryGetValue(type, out result);
+            return result;
+        }
+
+        private object GetGrainReference(GrainId id, Type interfaceType)
+        {
+            var interner = this.GetGrainReferenceInterner(interfaceType);
+            return interner.FindOrCreate(id, this.createTypedGrainReference, interfaceType);
+        }
+
+        private Interner<GrainId, object> GetGrainReferenceInterner(Type type)
+        {
+            Interner<GrainId, object> result;
+            if (this.grainReferenceCache.TryGetValue(type, out result)) return result;
+
+            // Attempt to add a new interner, but return whatever interner is actually set.
+            this.grainReferenceCache.TryAdd(type, new Interner<GrainId, object>());
+            this.grainReferenceCache.TryGetValue(type, out result);
+            return result;
+        }
+
+        private object GetGrainReference(GrainId id, Type interfaceType)
+        {
+            var interner = this.GetGrainReferenceInterner(interfaceType);
+            return interner.FindOrCreate(id, this.createTypedGrainReference, interfaceType);
+        }
+
         private IGrainMethodInvoker MakeInvoker(Type interfaceType)
         {
             var invokerType = this.typeCache.GetGrainMethodInvokerType(interfaceType);
@@ -282,7 +335,7 @@ namespace Orleans
             if (!this.casters.TryGetValue(interfaceType, out caster))
             {
                 // Create and cache a caster for the interface type.
-                caster = this.casters.GetOrAdd(interfaceType, this.MakeCaster);
+                caster = this.casters.GetOrAdd(interfaceType, this.makeCaster);
             }
 
             return caster(grain);
