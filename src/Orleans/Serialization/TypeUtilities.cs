@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Utilities;
 
 namespace Orleans.Serialization
 {
@@ -21,7 +22,6 @@ namespace Orleans.Serialization
         }
 
         static readonly ConcurrentDictionary<Type, bool> shallowCopyableTypes = new ConcurrentDictionary<Type, bool>();
-        static readonly ConcurrentDictionary<Type, string> typeNameCache = new ConcurrentDictionary<Type, string>();
         static readonly ConcurrentDictionary<Type, string> typeKeyStringCache = new ConcurrentDictionary<Type, string>();
         static readonly ConcurrentDictionary<Type, byte[]> typeKeyCache = new ConcurrentDictionary<Type, byte[]>();
 
@@ -93,13 +93,7 @@ namespace Orleans.Serialization
 
         internal static string OrleansTypeName(this Type t)
         {
-            string name;
-            if (typeNameCache.TryGetValue(t, out name))
-                return name;
-
-            name = TypeUtils.GetTemplatedName(t, _ => !_.IsGenericParameter);
-            typeNameCache[t] = name;
-            return name;
+            return RuntimeTypeNameFormatter.Format(t);
         }
 
         public static byte[] OrleansTypeKey(this Type t)
@@ -108,12 +102,12 @@ namespace Orleans.Serialization
             if (typeKeyCache.TryGetValue(t, out key))
                 return key;
 
-            key = Encoding.UTF8.GetBytes(t.OrleansTypeKeyString());
+            key = Encoding.UTF8.GetBytes(RuntimeTypeNameFormatter.Format(t));
             typeKeyCache[t] = key;
             return key;
         }
 
-        public static string OrleansTypeKeyString(this Type t)
+        public static string LegacyTypeKeyString(this Type t)
         {
             string key;
             if (typeKeyStringCache.TryGetValue(t, out key))
@@ -139,13 +133,13 @@ namespace Orleans.Serialization
                         sb.Append(',');
                     }
                     first = false;
-                    sb.Append(OrleansTypeKeyString(genericArgument));
+                    sb.Append(LegacyTypeKeyString(genericArgument));
                 }
                 sb.Append('>');
             }
             else if (t.IsArray)
             {
-                sb.Append(OrleansTypeKeyString(t.GetElementType()));
+                sb.Append(LegacyTypeKeyString(t.GetElementType()));
                 sb.Append('[');
                 if (t.GetArrayRank() > 1)
                 {
@@ -176,7 +170,7 @@ namespace Orleans.Serialization
 
             if (typeInfo.IsNestedPublic)
             {
-                return namespacePrefix + OrleansTypeKeyString(typeInfo.DeclaringType) + "." + typeInfo.Name;
+                return namespacePrefix + LegacyTypeKeyString(typeInfo.DeclaringType) + "." + typeInfo.Name;
             }
 
             return namespacePrefix + typeInfo.Name;

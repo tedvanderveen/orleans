@@ -404,7 +404,7 @@ namespace Orleans.Serialization
                 else
                 {
                     registeredTypes.Add(t);
-                    string name = t.OrleansTypeKeyString();
+                    string name = t.LegacyTypeKeyString();
                     lock (types)
                     {
                         types[name] = t;
@@ -460,7 +460,7 @@ namespace Orleans.Serialization
         /// <param name="t">Type to be registered.</param>
         private void Register(Type t)
         {
-            string name = t.OrleansTypeKeyString();
+            string name = t.LegacyTypeKeyString();
 
             lock (registeredTypes)
             {
@@ -1937,7 +1937,8 @@ namespace Orleans.Serialization
 
         internal Type ResolveTypeName(string typeName)
         {
-            Type t;
+            var t = Type.GetType(typeName, throwOnError: false);
+            if (t != null) return t;
 
             if (types.TryGetValue(typeName, out t))
                 return t;
