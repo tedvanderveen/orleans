@@ -9,7 +9,8 @@ namespace Orleans.Serialization
         Fallback = 2,       // .NET-serialized; followed by a ushort length and the serialized bytes
         True = 3,
         False = 4,
-        
+        //SpecifiedSerializer = 5, // Followed by a byte indicating which well-known serializer is being used.
+
         #endregion
 
         // Type definers

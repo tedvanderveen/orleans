@@ -1039,6 +1039,9 @@ namespace Orleans.Serialization
             if (fallbackSerializer.IsSupportedType(t))
                 return FallbackSerializationDeepCopy(original, context);
 
+/*            if (DotNetISerializableSerializer.IsSupportedType(t))
+                return DotNetISerializableSerializer.DeepCopy(original, context);*/
+
             throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + 
                 ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
         }
@@ -1198,6 +1201,15 @@ namespace Orleans.Serialization
                 sm.FallbackSerializer(obj, context, expected);
                 return;
             }
+
+/*            // If the object is ISerializable, serialize it as such.
+            if (DotNetISerializableSerializer.IsSupportedType(t))
+            {
+                context.StreamWriter.Write(SerializationTokenType.SpecifiedSerializer);
+                context.StreamWriter.Write((byte)SpecifiedSerializerToken.DotNetISerializable);
+                DotNetISerializableSerializer.Serialize(obj, context);
+                return;
+            }*/
 
             if (obj is Exception && !sm.fallbackSerializer.IsSupportedType(t))
             {
@@ -1517,6 +1529,10 @@ namespace Orleans.Serialization
                     context.RecordObject(fallbackResult);
                     return fallbackResult;
                 }
+/*                if (token == SerializationTokenType.SpecifiedSerializer)
+                {
+                    return DeserializeWithSpecifiedSerializer(expected, context);
+                }*/
 
                 Type resultType;
                 if (token == SerializationTokenType.ExpectedType)
@@ -2027,10 +2043,10 @@ namespace Orleans.Serialization
                 field.Name + "Get",
                 field.FieldType,
                 parameterTypes,
-                field.FieldType.GetTypeInfo().Module,
+                field.DeclaringType.GetTypeInfo().Module,
                 true);
 
-            // Emit IL to return the value of the Transaction property.
+            // Emit IL to get the field value.
             var emitter = method.GetILGenerator();
             emitter.Emit(OpCodes.Ldarg_0);
             emitter.Emit(OpCodes.Ldfld, field);
@@ -2086,9 +2102,9 @@ namespace Orleans.Serialization
             }
 
             // Create a method to hold the generated IL.
-            var method = new DynamicMethod(field.Name + "Set", null, parameterTypes, field.FieldType.GetTypeInfo().Module, true);
+            var method = new DynamicMethod(field.Name + "Set", null, parameterTypes, field.DeclaringType.GetTypeInfo().Module, true);
 
-            // Emit IL to return the value of the Transaction property.
+            // Emit IL to set the field.
             var emitter = method.GetILGenerator();
             emitter.Emit(OpCodes.Ldarg_0);
             emitter.Emit(OpCodes.Ldarg_1);
@@ -2197,6 +2213,23 @@ namespace Orleans.Serialization
             public DeepCopier DeepCopy { get; private set; }
             public Serializer Serialize { get; private set; }
             public Deserializer Deserialize { get; private set; }
+        }
+
+        private enum SpecifiedSerializerToken : byte
+        {
+            DotNetISerializable = 0x01,
+        }
+
+        private static object DeserializeWithSpecifiedSerializer(Type expected, IDeserializationContext context)
+        {
+            var key = (SpecifiedSerializerToken)context.StreamReader.ReadByte();
+            switch (key)
+            {
+                case SpecifiedSerializerToken.DotNetISerializable:
+                    return DotNetISerializableSerializer.Deserialize(expected, context);
+                default:
+                    throw new NotSupportedException($"Serialized 0x{(byte)key:X} is not supported.");
+            }
         }
     }
 }
