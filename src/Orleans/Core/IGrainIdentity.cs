@@ -1,4 +1,5 @@
 ﻿using System;
+using Orleans.Runtime;
 
 namespace Orleans.Core
 {
@@ -22,4 +23,13 @@ namespace Orleans.Core
 
         uint GetUniformHashCode();
     }
+
+public interface IGrainReferenceFactory
+{
+    GrainReference GetGrain(Type interfaceType, Guid primaryKey, string keyExtension, string grainClassNamePrefix);
+    GrainReference GetGrain(Type interfaceType, long primaryKey, string keyExtension, string grainClassNamePrefix);
+    GrainReference GetGrain(Type interfaceType, Guid primaryKey, string grainClassNamePrefix);
+    GrainReference GetGrain(Type interfaceType, long primaryKey, string grainClassNamePrefix);
+    GrainReference GetGrain(Type interfaceType, string primaryKey, string grainClassNamePrefix);
+}
 }

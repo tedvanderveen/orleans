@@ -326,7 +326,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Called from generated code.
         /// </summary>
-        protected Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
+        protected internal Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
         {
             object[] argsDeepCopy = null;
             if (arguments != null)
@@ -361,6 +361,11 @@ namespace Orleans.Runtime
         #endregion
 
         #region Private members
+
+        internal Task<object> InvokeMethodAsync(InvokeMethodRequest request, InvokeMethodOptions options)
+        {
+            return InvokeMethod_Impl(request, null, options);
+        }
 
         private Task<object> InvokeMethod_Impl(InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
         {
