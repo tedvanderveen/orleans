@@ -28,7 +28,7 @@ namespace TestExtensions
             return result;
         }
 
-        private static void MixinDefaults(ClientConfiguration config)
+        protected static ClientConfiguration MixinDefaults(ClientConfiguration config)
         {
             if (config.GatewayProvider == ClientConfiguration.GatewayProviderType.None)
             {
@@ -36,6 +36,7 @@ namespace TestExtensions
                 config.Gateways.Add(new IPEndPoint(0, 0));
             }
             config.TraceToConsole = false;
+            return config;
         }
 
         internal OutsideRuntimeClient RuntimeClient { get; set; }

@@ -28,4 +28,14 @@
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
   </ItemGroup>
+
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\Bootstrap\</OrleansReferencesBase>
+  </PropertyGroup>
+
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
+  <!--End Orleans -->
 </Project>

@@ -1,12 +1,7 @@
 using System;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
-using TestExtensions;
-using UnitTests.GrainInterfaces;
 using Xunit;
-using System.Xml;
 using Orleans.EventSourcing.StateStorage;
 
 namespace Tester.EventSourcingTests
@@ -15,6 +10,7 @@ namespace Tester.EventSourcingTests
     /// Summary description for SerializationTests
     /// </summary>
     [Collection(EventSourceEnvironmentFixture.EventSource)]
+    [TestCategory("BVT"), TestCategory("Serialization"), TestCategory("EventSourcing")]
     public class SerializationTestsJsonTypes
     {
         [Serializable]
@@ -114,7 +110,7 @@ namespace Tester.EventSourcingTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("Serialization")]
+        [Fact]
         public void SerializationTests_GrainStateWithMetaDataAndETag_SerializableView()
         {
             GrainStateWithMetaDataAndETag<SimplePOCO> input = new GrainStateWithMetaDataAndETag<SimplePOCO>(new SimplePOCO { A = 1, B = 2 });
@@ -124,7 +120,7 @@ namespace Tester.EventSourcingTests
             Assert.Equal(input.ToString(), output.ToString());
         }
 
-        [Fact, TestCategory("Serialization")]
+        [Fact]
         public void SerializationTests_GrainStateWithMetaDataAndETag_NonSerializableView()
         {
             GrainStateWithMetaDataAndETag<AdvancedPOCO> input = new GrainStateWithMetaDataAndETag<AdvancedPOCO>(new AdvancedPOCO { A = 1, B = 2 });
@@ -135,7 +131,7 @@ namespace Tester.EventSourcingTests
         }
 
 
-        [Fact, TestCategory("Serialization")]
+        [Fact]
         public void SerializationTests_GrainStateWithMetaDataAndETag_CopySerializableView()
         {
             GrainStateWithMetaDataAndETag<SimplePOCO> input = new GrainStateWithMetaDataAndETag<SimplePOCO>("eTag", new SimplePOCO { A = 1, B = 2 }, 1, "writeVector");
@@ -145,7 +141,7 @@ namespace Tester.EventSourcingTests
             Assert.Equal(input.ToString(), output.ToString());
         }
 
-        [Fact, TestCategory("Serialization")]
+        [Fact]
         public void SerializationTests_GrainStateWithMetaDataAndETag_CopyNonSerializableView()
         {
             GrainStateWithMetaDataAndETag<AdvancedPOCO> input = new GrainStateWithMetaDataAndETag<AdvancedPOCO>("eTag", new AdvancedPOCO { A = 1, B = 2 }, 1, "writeVector");
@@ -155,7 +151,7 @@ namespace Tester.EventSourcingTests
             Assert.Equal(input.ToString(), output.ToString());
         }
 
-        [Fact, TestCategory("Serialization")]
+        [Fact]
         public void SerializationTests_GrainStateWithMetaDataAndETag_CustomSerialization()
         {
             GrainStateWithMetaDataAndETag<ReportingPOCO> input = new GrainStateWithMetaDataAndETag<ReportingPOCO>(new ReportingPOCO { A = 1, B = 2 });
@@ -165,6 +161,18 @@ namespace Tester.EventSourcingTests
             Assert.Equal(0, output.State.CopyCount);
             Assert.Equal(1, output.State.SerializeCount);
             Assert.Equal(1, output.State.DeserializeCount);
+        }
+
+        [Fact, TestCategory("CodeGen")]
+        public void SerializationTests_EventSourcing_TypesHaveSerializers()
+        {
+            Assert.True(
+                this.fixture.SerializationManager.HasSerializer(typeof(GrainStateWithMetaData<SimplePOCO>)),
+                $"Should be able to serialize type {nameof(GrainStateWithMetaData<SimplePOCO>)}.");
+
+            Assert.True(
+                this.fixture.SerializationManager.HasSerializer(typeof(GrainStateWithMetaDataAndETag<SimplePOCO>)),
+                $"Should be able to serialize type {nameof(GrainStateWithMetaDataAndETag<SimplePOCO>)}.");
         }
     }
 }

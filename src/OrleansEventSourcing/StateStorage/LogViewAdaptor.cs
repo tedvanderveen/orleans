@@ -45,13 +45,13 @@ namespace Orleans.EventSourcing.StateStorage
         /// <inheritdoc/>
         protected override TLogView LastConfirmedView()
         {
-            return GlobalStateCache.State;
+            return GlobalStateCache.StateAndMetaData.State;
         }
 
         /// <inheritdoc/>
         protected override int GetConfirmedVersion()
         {
-            return GlobalStateCache.GlobalVersion;
+            return GlobalStateCache.StateAndMetaData.GlobalVersion;
         }
 
         /// <inheritdoc/>
@@ -111,11 +111,11 @@ namespace Orleans.EventSourcing.StateStorage
             bool batchsuccessfullywritten = false;
 
             var nextglobalstate = new GrainStateWithMetaDataAndETag<TLogView>(state);
-            nextglobalstate.WriteVector = GlobalStateCache.WriteVector;
-            nextglobalstate.GlobalVersion = GlobalStateCache.GlobalVersion + updates.Length;
+            nextglobalstate.StateAndMetaData.WriteVector = GlobalStateCache.StateAndMetaData.WriteVector;
+            nextglobalstate.StateAndMetaData.GlobalVersion = GlobalStateCache.StateAndMetaData.GlobalVersion + updates.Length;
             nextglobalstate.ETag = GlobalStateCache.ETag;
 
-            var writebit = nextglobalstate.FlipBit(Services.MyClusterId);
+            var writebit = nextglobalstate.StateAndMetaData.FlipBit(Services.MyClusterId);
 
             try
             {
@@ -166,7 +166,7 @@ namespace Orleans.EventSourcing.StateStorage
 
                 // check if last apparently failed write was in fact successful
 
-                if (writebit == GlobalStateCache.GetBit(Services.MyClusterId))
+                if (writebit == GlobalStateCache.StateAndMetaData.GetBit(Services.MyClusterId))
                 {
                     GlobalStateCache = nextglobalstate;
 
@@ -181,7 +181,7 @@ namespace Orleans.EventSourcing.StateStorage
             if (batchsuccessfullywritten)
                 BroadcastNotification(new UpdateNotificationMessage()
                    {
-                       Version = GlobalStateCache.GlobalVersion,
+                       Version = GlobalStateCache.StateAndMetaData.GlobalVersion,
                        Updates = updates.Select(se => se.Entry).ToList(),
                        Origin = Services.MyClusterId,
                        ETag = GlobalStateCache.ETag
@@ -289,14 +289,14 @@ namespace Orleans.EventSourcing.StateStorage
         protected override void ProcessNotifications()
         {
             // discard notifications that are behind our already confirmed state
-            while (notifications.Count > 0 && notifications.ElementAt(0).Key < GlobalStateCache.GlobalVersion)
+            while (notifications.Count > 0 && notifications.ElementAt(0).Key < GlobalStateCache.StateAndMetaData.GlobalVersion)
             {
                 Services.Log(Severity.Verbose, "discarding notification {0}", notifications.ElementAt(0).Value);
                 notifications.RemoveAt(0);
             }
 
             // process notifications that reflect next global version
-            while (notifications.Count > 0 && notifications.ElementAt(0).Key == GlobalStateCache.GlobalVersion)
+            while (notifications.Count > 0 && notifications.ElementAt(0).Key == GlobalStateCache.StateAndMetaData.GlobalVersion)
             {
                 var updateNotification = notifications.ElementAt(0).Value;
                 notifications.RemoveAt(0);
@@ -305,16 +305,16 @@ namespace Orleans.EventSourcing.StateStorage
                 foreach (var u in updateNotification.Updates)
                     try
                     {
-                        Host.UpdateView(GlobalStateCache.State, u);
+                        Host.UpdateView(GlobalStateCache.StateAndMetaData.State, u);
                     }
                     catch (Exception e)
                     {
                         Services.CaughtUserCodeException("UpdateView", nameof(ProcessNotifications), e);
                     }
 
-                GlobalStateCache.GlobalVersion = updateNotification.Version;
+                GlobalStateCache.StateAndMetaData.GlobalVersion = updateNotification.Version;
 
-                GlobalStateCache.FlipBit(updateNotification.Origin);
+                GlobalStateCache.StateAndMetaData.FlipBit(updateNotification.Origin);
 
                 GlobalStateCache.ETag = updateNotification.ETag;         
 
