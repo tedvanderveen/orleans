@@ -1,10 +1,5 @@
-<Project>
+<Project TreatAsLocalProperty="TaskFolder" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
   <!-- Begin Orleans: Without these lines the project won't build properly -->
-  <!-- Set path to ClientGenerator.exe -->
-  <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
-    <!--<OrleansReferencesBase>$(ProjectDir)../Bootstrap/$(BuildFlavor)/$(Configuration)</OrleansReferencesBase>-->
-    <OrleansReferencesBase>$(SourceRoot)/Bootstrap/$(BuildFlavor)/$(Configuration)/</OrleansReferencesBase>
-  </PropertyGroup>
   <Import Project="$(SourceRoot)/src/Orleans.SDK.targets" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and Exists('$(SourceRoot)/src/Orleans.SDK.targets') " />
   <!--End Orleans -->
 </Project>

@@ -88,7 +88,7 @@
     </PropertyGroup>
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - OutputPath: $(BootstrapOutputPath)" Importance="high" />
     <!-- Compile code generator -->
-    <MSBuild Projects="$(ProjectDir)..\ClientGenerator\BootstrapCodegen.proj" Properties="BootstrapOutputPath=$(BootstrapOutputPath);Bootstrap=true" Targets="Build" UnloadProjectsOnCompletion="true" UseResultsCache="false" BuildInParallel="true" />
+    <MSBuild Projects="$(ProjectDir)..\BootstrapCodegen\BootstrapCodegen.proj" Properties="BootstrapOutputPath=$(BootstrapOutputPath);Bootstrap=true" Targets="Build" UnloadProjectsOnCompletion="true" UseResultsCache="false" BuildInParallel="true" />
     <!-- Finally invoke code generator on the recently built Orleans.dll -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Building ClientGenerator finished" Importance="high" />
   </Target>

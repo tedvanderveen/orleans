@@ -4,36 +4,36 @@ Orleans Target for SDK Developers
 Copyright (C) Microsoft Corporation. All rights reserved.
 ***********************************************************************************************
 -->
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" TreatAsLocalProperties="TaskFolder;CodeGenToolExeDir;CodeGenToolExe">
 
-  <!-- Work out the path to ClientGenerator.exe -->
-  <Choose>
-    <!-- Using Orleans NuGet packages -->
-    <When Condition="Exists('$(MSBuildThisFileDirectory)../tools/ClientGenerator.exe')">
-      <PropertyGroup>
-        <CodeGenToolExeDir>$(MSBuildThisFileDirectory)../tools</CodeGenToolExeDir>
-      </PropertyGroup>
-    </When>
-    <!-- Internal build within Orleans.sln -->
-    <When Condition="'$(OrleansReferencesBase)' != ''">
-      <PropertyGroup>
-        <CodeGenToolExeDir>$(OrleansReferencesBase)</CodeGenToolExeDir>
-      </PropertyGroup>
-    </When>
-  </Choose>
+  <PropertyGroup>
+    <DotNetExecutable Condition="'$(DotNetExecutable)' == '' and '$(_dotnet)' != ''">$(_dotnet)</DotNetExecutable>
+    <DotNetExecutable Condition="'$(DotNetExecutable)' == ''">dotnet</DotNetExecutable>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="
+    Exists('$(MSBuildThisFileDirectory)../tools/net461/ClientGenerator.exe')
+    and '$(MSBuildRuntimeType)' != 'Core'
+    and '$(CodeGenToolExe)' == ''">
+    <CodeGenToolExe>$(MSBuildThisFileDirectory)../tools/net461/ClientGenerator.exe</CodeGenToolExe>
+  </PropertyGroup>
+  <PropertyGroup Condition="
+    Exists('$(MSBuildThisFileDirectory)../tools/netcoreapp2.0/ClientGenerator.dll')
+    and '$(MSBuildRuntimeType)' == 'Core'
+    and '$(CodeGenToolExe)' == ''">
+    <CodeGenToolExe>$(DotNetExecutable) $(MSBuildThisFileDirectory)../tools/netcoreapp2.0/ClientGenerator.dll</CodeGenToolExe>
+  </PropertyGroup>
 
-  <Choose>
-    <When Condition="HasTrailingSlash('$(CodeGenToolExeDir)')">
-      <PropertyGroup>
-        <CodeGenToolExe>$(CodeGenToolExeDir)ClientGenerator.exe</CodeGenToolExe>
-      </PropertyGroup>
-    </When>
-    <Otherwise>
-      <PropertyGroup>
-        <CodeGenToolExe>$(CodeGenToolExeDir)/ClientGenerator.exe</CodeGenToolExe>
-      </PropertyGroup>
-    </Otherwise>
-  </Choose>
+  <PropertyGroup Condition=" '$(MSBuildRuntimeType)' == 'Core'
+    and '$(CodeGenToolExe)' == ''">
+    <TaskFolder>netcoreapp2.0</TaskFolder>
+    <CodeGenToolExe>$(DotNetExecutable) $(MSBuildThisFileDirectory)ClientGenerator\bin\$(Configuration)\netcoreapp2.0\ClientGenerator.dll</CodeGenToolExe>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(MSBuildRuntimeType)' != 'Core' 
+    and '$(CodeGenToolExe)' == ''">
+    <TaskFolder>net461</TaskFolder>
+    <CodeGenToolExe>$(MSBuildThisFileDirectory)ClientGenerator\bin\$(Configuration)\$(TaskFolder)\ClientGenerator.exe</CodeGenToolExe>
+  </PropertyGroup>
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="OrleansCodeGeneration"
@@ -42,9 +42,8 @@ Copyright (C) Microsoft Corporation. All rights reserved.
           Inputs="@(Compile);@(ReferencePath)"
           Outputs="$(IntermediateOutputPath)$(TargetName).orleans.g.cs">
     <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
-    <Error Text="$(CodeGenToolExe) could not be found!" Condition="!Exists('$(CodeGenToolExe)')" />
     <Message Text="[OrleansCodeGeneration]
-- CodeGenToolExeDir=$(CodeGenToolExeDir)
+- CodeGenToolExe=$(CodeGenToolExe)
 - OrleansReferencesBase=$(OrleansReferencesBase)
 - OrleansSDK=$(OrleansSDK)
 - Using CodeGenToolExe location=$(CodeGenToolExe)
@@ -65,7 +64,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <Message Text="[OrleansCodeGeneration] - Code-gen args file=$(ArgsFile)"/>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
     <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
-    <Exec Command="&quot;$(CodeGenToolExe)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(CodeGenFilename)">
+    <Exec Command="$(CodeGenToolExe) &quot;@$(ArgsFile)&quot;" Outputs="$(CodeGenFilename)">
       <Output TaskParameter="Outputs" ItemName="Compile" />
       <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>

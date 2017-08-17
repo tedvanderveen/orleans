@@ -19,6 +19,44 @@
 <!--  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <ExcludeCodegenConstants>$(ExcludeCodegenConstants);NETSTANDARD;NETSTANDARD_TODO</ExcludeCodegenConstants>
   </PropertyGroup>-->
+  <Target Name="Restore">
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
+    <MSBuild
+      Projects="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj"
+      Properties="$(MsBuildProperties)"
+      Targets="Restore"
+      UnloadProjectsOnCompletion="true"
+      UseResultsCache="false"
+      BuildInParallel="false" />
+    <MSBuild
+      Projects="..\Orleans\Orleans.csproj"
+      Properties="$(MsBuildProperties)"
+      Targets="Restore"
+      UnloadProjectsOnCompletion="true"
+      UseResultsCache="false"
+      BuildInParallel="false" />
+    <MSBuild
+      Projects="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj"
+      Properties="$(MsBuildProperties)"
+      Targets="Restore"
+      UnloadProjectsOnCompletion="true"
+      UseResultsCache="false"
+      BuildInParallel="false" />
+    <MSBuild
+      Projects="..\CodeGenerator.MSBuild\CodeGenerator.MSBuild.csproj"
+      Properties="$(MsBuildProperties)"
+      Targets="Restore"
+      UnloadProjectsOnCompletion="true"
+      UseResultsCache="false"
+      BuildInParallel="false" />
+    <MSBuild
+      Projects="..\ClientGenerator\ClientGenerator.csproj"
+      Properties="$(MsBuildProperties)"
+      Targets="Restore"
+      UnloadProjectsOnCompletion="true"
+      UseResultsCache="false"
+      BuildInParallel="false" />
+  </Target>
   <Target Name="Build">
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
     <MSBuild
@@ -43,7 +81,14 @@
       UseResultsCache="false"
       BuildInParallel="false" />
     <MSBuild
-      Projects="ClientGenerator.csproj"
+      Projects="..\CodeGenerator.MSBuild\CodeGenerator.MSBuild.csproj"
+      Properties="$(MsBuildProperties)"
+      Targets="Build"
+      UnloadProjectsOnCompletion="true"
+      UseResultsCache="false"
+      BuildInParallel="false" />
+    <MSBuild
+      Projects="..\ClientGenerator\ClientGenerator.csproj"
       Properties="$(MsBuildProperties)"
       Targets="Build"
       UnloadProjectsOnCompletion="true"
@@ -74,7 +119,14 @@
       UseResultsCache="false"
       BuildInParallel="false" />
     <MSBuild
-      Projects="ClientGenerator.csproj"
+      Projects="..\CodeGenerator.MSBuild\CodeGenerator.MSBuild.csproj"
+      Properties="$(MsBuildProperties)"
+      Targets="Clean"
+      UnloadProjectsOnCompletion="true"
+      UseResultsCache="false"
+      BuildInParallel="false" />
+    <MSBuild
+      Projects="..\ClientGenerator\ClientGenerator.csproj"
       Properties="$(MsBuildProperties)"
       Targets="Clean"
       UnloadProjectsOnCompletion="true"
