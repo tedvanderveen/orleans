@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Fabric.Description;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 
 namespace Microsoft.Orleans.ServiceFabric
 {
@@ -82,7 +83,7 @@ namespace Microsoft.Orleans.ServiceFabric
         /// Gets or sets the underlying <see cref="ISiloHost"/>.
         /// </summary>
         /// <remarks>Exposed for testability.</remarks>
-        internal ISiloHost SiloHost { get; set; } = new SiloHostWrapper();
+        internal ISilo SiloHost { get; } = new SiloHostWrapper();
 
         /// <summary>
         /// Starts the silo.

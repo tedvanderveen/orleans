@@ -52,7 +52,6 @@
     <Compile Include="Utilities\ServiceFabricExtensions.cs" />
     <Compile Include="Utilities\FabricQueryManager.cs" />
     <Compile Include="Utilities\IFabricQueryManager.cs" />
-    <Compile Include="Utilities\ISiloHost.cs" />
     <Compile Include="OrleansServiceFabricExtensions.cs" />
     <Compile Include="OrleansServiceListener.cs" />
     <Compile Include="OrleansCommunicationListener.cs" />
@@ -61,7 +60,6 @@
     <Compile Include="Models\ServicePartitionSilos.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Models\FabricSiloInfo.cs" />
-    <Compile Include="Utilities\SiloHostWrapper.cs" />
     <Compile Include="Utilities\WaitHandleExtensions.cs" />
   </ItemGroup>
   <ItemGroup>

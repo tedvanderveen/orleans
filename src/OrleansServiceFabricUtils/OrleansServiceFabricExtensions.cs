@@ -9,6 +9,7 @@ using Orleans.Runtime;
 
 namespace Microsoft.Orleans.ServiceFabric
 {
+    using global::Orleans.Runtime.Hosting;
     using Microsoft.Orleans.ServiceFabric.Utilities;
     using Microsoft.ServiceFabric.Services.Client;
 
@@ -17,6 +18,28 @@ namespace Microsoft.Orleans.ServiceFabric
     /// </summary>
     public static class OrleansServiceFabricExtensions
     {
+        /// <summary>
+        /// Adds Service Fabric support hosting to the silo builder.
+        /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="service">The Service Fabric service.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder AddServiceFabricSupport(this ISiloBuilder builder, StatefulService service)
+        {
+            return builder.ConfigureServices(services => services.AddServiceFabricSupport(service));
+        }
+
+        /// <summary>
+        /// Adds Service Fabric support hosting to the silo builder.
+        /// </summary>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="service">The Service Fabric service.</param>
+        /// <returns>The silo builder.</returns>
+        public static ISiloBuilder AddServiceFabricSupport(this ISiloBuilder builder, StatelessService service)
+        {
+            return builder.ConfigureServices(services => services.AddServiceFabricSupport(service));
+        }
+
         /// <summary>
         /// Adds Service Fabric support to the provided service collection.
         /// </summary>
@@ -28,6 +51,10 @@ namespace Microsoft.Orleans.ServiceFabric
             StatefulService service)
         {
             AddStandardServices(serviceCollection);
+            AddSiloServices(serviceCollection, service.Context);
+            serviceCollection.AddSingleton(service);
+            serviceCollection.AddSingleton(service.StateManager);
+
 
             // Use Service Fabric for cluster membership.
             serviceCollection.AddSingleton<IFabricServiceSiloResolver>(
@@ -42,8 +69,7 @@ namespace Microsoft.Orleans.ServiceFabric
             serviceCollection.AddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
 
             // In order to support local, replicated persistence, the state manager must be registered.
-            serviceCollection.AddTransient(_ => service.StateManager);
-            serviceCollection.AddTransient<ServiceContext>(_ => service.Context);
+            serviceCollection.AddSingleton<ServiceContext>(service.Context);
 
             return serviceCollection;
         }
@@ -59,12 +85,19 @@ namespace Microsoft.Orleans.ServiceFabric
             StatelessService service)
         {
             AddStandardServices(serviceCollection);
+            AddSiloServices(serviceCollection, service.Context);
+            serviceCollection.AddSingleton(service);
 
+            return serviceCollection;
+        }
+
+        private static void AddSiloServices(IServiceCollection serviceCollection, ServiceContext context)
+        {
             // Use Service Fabric for cluster membership.
             serviceCollection.AddSingleton<IFabricServiceSiloResolver>(
                 sp =>
                     new FabricServiceSiloResolver(
-                        service.Context.ServiceName,
+                        context.ServiceName,
                         sp.GetService<IFabricQueryManager>(),
                         sp.GetService<Factory<string, Logger>>()));
             serviceCollection.AddSingleton<IMembershipOracle, FabricMembershipOracle>();
@@ -72,9 +105,7 @@ namespace Microsoft.Orleans.ServiceFabric
             serviceCollection.AddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
 
             serviceCollection.AddSingleton<IGatewayListProvider, FabricGatewayProvider>();
-            serviceCollection.AddTransient<ServiceContext>(_ => service.Context);
-
-            return serviceCollection;
+            serviceCollection.AddSingleton<ServiceContext>(context);
         }
 
         /// <summary>
