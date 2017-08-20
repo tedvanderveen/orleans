@@ -1,4 +1,6 @@
-﻿using Orleans.Serialization;
+﻿using System;
+using NodaTime;
+using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -50,6 +52,28 @@ namespace DefaultCluster.Tests
 
             Assert.IsAssignableFrom<ValueTypeTestData>(copy);
             Assert.Equal<int>(4, ((ValueTypeTestData)copy).GetValue());
+        }
+
+        [Serializable]
+        public class Request
+        {
+            public LocalDate Date { get; }
+
+            public Request(LocalDate date)
+            {
+                this.Date = date;
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
+        public void Serialization_NodaTime()
+        {
+            var data = new Request(new LocalDate());
+
+            object obj = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(data);
+
+            Assert.IsAssignableFrom<Request>(obj);
+            Assert.Equal<LocalDate>(new LocalDate(), ((Request)obj).Date);
         }
     }
 }
