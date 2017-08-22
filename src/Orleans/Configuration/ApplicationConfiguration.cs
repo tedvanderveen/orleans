@@ -349,7 +349,7 @@ namespace Orleans.Runtime.Configuration
             Type type = null;               
             try
             {
-                type = TypeUtils.ResolveType(FullTypeName);
+                type = CachedTypeResolver.Instance.ResolveType(FullTypeName);
             }
             catch (Exception exception)
             {

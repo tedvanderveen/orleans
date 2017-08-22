@@ -131,7 +131,7 @@ namespace Orleans.Serialization
 
         #region Static initialization
         
-        public SerializationManager(IServiceProvider serviceProvider, IMessagingConfiguration config, ITraceConfiguration traceConfig, ILoggerFactory loggerFactory)
+        public SerializationManager(IServiceProvider serviceProvider, IMessagingConfiguration config, ILoggerFactory loggerFactory)
         {
             var serializationProviders = config.SerializationProviders;
             var fallbackType = config.FallbackSerializationProvider;
@@ -259,10 +259,12 @@ namespace Orleans.Serialization
             // Built-in handlers: random system types
             Register(typeof(TimeSpan), BuiltInTypes.CopyTimeSpan, BuiltInTypes.SerializeTimeSpan, BuiltInTypes.DeserializeTimeSpan);
             Register(typeof(DateTimeOffset), BuiltInTypes.CopyDateTimeOffset, BuiltInTypes.SerializeDateTimeOffset, BuiltInTypes.DeserializeDateTimeOffset);
-            Register(typeof(Type), BuiltInTypes.CopyType, BuiltInTypes.SerializeType, BuiltInTypes.DeserializeType);
+
+            var typeSerializer = ActivatorUtilities.CreateInstance<BuiltInTypes.DefaultTypeSerializer>(this.serviceProvider);
+            Register(typeof(Type), typeSerializer.CopyType, typeSerializer.SerializeType, typeSerializer.DeserializeType);
             // ReSharper disable PossibleMistakenCallToGetType.2
             // RuntimeType is internal but can be obtained indirectly by calling GetType().
-            Register(typeof(object).GetType(), BuiltInTypes.CopyType, BuiltInTypes.SerializeType, BuiltInTypes.DeserializeType);
+            Register(typeof(object).GetType(), typeSerializer.CopyType, typeSerializer.SerializeType, typeSerializer.DeserializeType);
             // ReSharper restore PossibleMistakenCallToGetType.2
             Register(typeof(Guid), BuiltInTypes.CopyGuid, BuiltInTypes.SerializeGuid, BuiltInTypes.DeserializeGuid);
             Register(typeof(IPAddress), BuiltInTypes.CopyIPAddress, BuiltInTypes.SerializeIPAddress, BuiltInTypes.DeserializeIPAddress);
@@ -1893,6 +1895,7 @@ namespace Orleans.Serialization
             }
             else
             {
+                serializer = ActivatorUtilities.CreateInstance<ILBasedSerializer>(serviceProvider);
                 serializer = new BinaryFormatterSerializer();
             }
 

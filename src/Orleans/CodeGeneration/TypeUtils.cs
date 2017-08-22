@@ -501,16 +501,7 @@ namespace Orleans.Runtime
 
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
         }
-
-        public static Type ResolveType(string fullName)
-        {
-            return CachedTypeResolver.Instance.ResolveType(fullName);
-        }
-
-        public static bool TryResolveType(string fullName, out Type type)
-        {
-            return CachedTypeResolver.Instance.TryResolveType(fullName, out type);
-        }
+        
 
         private static Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
         {

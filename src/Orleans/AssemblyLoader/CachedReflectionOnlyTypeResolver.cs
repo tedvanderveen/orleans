@@ -12,21 +12,7 @@ namespace Orleans.Runtime
         }
 
         public static new CachedReflectionOnlyTypeResolver Instance { get; private set; }
-
-        protected override bool TryPerformUncachedTypeResolution(string name, out Type type)
-        {
-            AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve += OnReflectionOnlyAssemblyResolve;
-            try
-            {
-                type = Type.ReflectionOnlyGetType(name, false, false);
-                return type != null;
-            }
-            finally
-            {
-                AppDomain.CurrentDomain.ReflectionOnlyAssemblyResolve -= OnReflectionOnlyAssemblyResolve;
-            }
-        }
-
+        
         public static Assembly OnReflectionOnlyAssemblyResolve(object sender, ResolveEventArgs args)
         {
             // loading into the reflection-only context doesn't resolve dependencies automatically.

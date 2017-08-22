@@ -90,7 +90,6 @@ namespace Orleans.Hosting
             services.AddLogging();
             //temporary change until runtime moved away from Logger
             services.TryAddSingleton(typeof(LoggerWrapper<>));
-            services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
             services.TryAddSingleton<IStreamProviderManager, StreamProviderManager>();
@@ -199,6 +198,10 @@ namespace Orleans.Hosting
             
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
+            // Serialization
+            services.TryAddSingleton<SerializationManager>();
+            services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
+            
             // Transactions
             services.TryAddSingleton<ITransactionAgent, TransactionAgent>();
             services.TryAddSingleton<Factory<ITransactionAgent>>(sp => () => sp.GetRequiredService<ITransactionAgent>());

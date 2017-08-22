@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Logging;
+using Microsoft.Extensions.DependencyInjection;
+
 
 namespace Orleans.CodeGeneration
 {
@@ -128,7 +130,15 @@ namespace Orleans.CodeGeneration
             var config = new ClusterConfiguration();
             var loggerFactory = new LoggerFactory();
             loggerFactory.AddProvider(new FileLoggerProvider("ClientGenerator.log"));
-            var codeGenerator = new RoslynCodeGenerator(new SerializationManager(null, config.Globals, config.Defaults, loggerFactory), loggerFactory);
+            var services = new ServiceCollection();
+            services.AddSingleton<RoslynCodeGenerator>();
+            services.AddSingleton<ILoggerFactory>(loggerFactory);
+            services.AddSingleton<IMessagingConfiguration>(config.Globals);
+            services.AddSingleton<ITraceConfiguration>(config.Defaults);
+            services.AddSingleton<SerializationManager>();
+            services.AddSingleton<ITypeResolver, CachedTypeResolver>();
+            var serviceProvider = services.BuildServiceProvider();
+            var codeGenerator = serviceProvider.GetRequiredService<RoslynCodeGenerator>();
 
             // Generate source
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);

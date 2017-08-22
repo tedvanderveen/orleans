@@ -24,7 +24,7 @@
         private readonly ConcurrentDictionary<Type, SerializerBundle> serializers =
             new ConcurrentDictionary<Type, SerializerBundle>();
 
-        private readonly TypeSerializer typeSerializer = new TypeSerializer();
+        private readonly TypeSerializer typeSerializer;
 
         /// <summary>
         /// The serializer used when a concrete type is not known.
@@ -40,8 +40,9 @@
 
         private readonly Func<Type, SerializerBundle> generateSerializer;
 
-        public ILBasedSerializer()
+        public ILBasedSerializer(ITypeResolver typeResolver)
         {
+            this.typeSerializer = new TypeSerializer(typeResolver);
             var fallbackExceptionSerializer = new ILBasedExceptionSerializer(this.generator, this.typeSerializer);
             this.exceptionSerializer = new SerializerBundle(
                 new SerializationManager.SerializerMethods(
