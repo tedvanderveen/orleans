@@ -3,7 +3,7 @@ using Orleans;
 
 namespace GrainInterfaces
 {
-    public interface  ICalculatorGrain : IGrainWithGuidKey
+    public interface ICalculatorGrain : IGrainWithGuidKey
     {
         Task<double> Add(double value);
         Task<double> Subtract(double value);
@@ -13,6 +13,10 @@ namespace GrainInterfaces
         Task<double> Get();
 
         Task Subscribe(ICalculatorObserver observer);
+    }
+
+    public interface ICalculatorObserverGrain : IGrainWithGuidKey
+    {
     }
 
     public interface ICalculatorObserver : IGrainObserver

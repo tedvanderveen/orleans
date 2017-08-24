@@ -66,6 +66,8 @@ namespace StatelessCalculatorService
             config.Globals.DataConnectionString = "UseDevelopmentStorage=true";
             config.Globals.RegisterBootstrapProvider<BootstrapProvider>("booter");
             config.Defaults.StartupTypeName = typeof(ClusterStartup).AssemblyQualifiedName;
+            config.AddAzureQueueStreamProviderV2("default", connectionString: "UseDevelopmentStorage=true", deploymentId: "default");
+            config.AddMemoryStorageProvider("PubSubStore");
             LogManager.LogConsumers.Add(new EventSourceLogger());
             return config;
         }
