@@ -26,13 +26,11 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 
   <PropertyGroup Condition=" '$(MSBuildRuntimeType)' == 'Core'
     and '$(CodeGenToolExe)' == ''">
-    <TaskFolder>netcoreapp2.0</TaskFolder>
-    <CodeGenToolExe>$(DotNetExecutable) $(MSBuildThisFileDirectory)ClientGenerator\bin\$(Configuration)\netcoreapp2.0\ClientGenerator.dll</CodeGenToolExe>
+    <CodeGenToolExe>$(DotNetExecutable) $(OrleansReferencesBase)ClientGenerator.dll</CodeGenToolExe>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(MSBuildRuntimeType)' != 'Core' 
     and '$(CodeGenToolExe)' == ''">
-    <TaskFolder>net461</TaskFolder>
-    <CodeGenToolExe>$(MSBuildThisFileDirectory)ClientGenerator\bin\$(Configuration)\$(TaskFolder)\ClientGenerator.exe</CodeGenToolExe>
+    <CodeGenToolExe>$(OrleansReferencesBase)ClientGenerator.exe</CodeGenToolExe>
   </PropertyGroup>
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->

@@ -15,6 +15,13 @@
       IsPackable=false;
       GeneratePackageOnBuild=false;
     </MsBuildProperties>
+    <MultiTargetMsBuildProperties>
+      Configuration=$(Configuration);
+      Bootstrap=true;
+      DefineConstants=$(ExcludeCodegenConstants);
+      IsPackable=false;
+      GeneratePackageOnBuild=false;
+    </MultiTargetMsBuildProperties>
   </PropertyGroup>
 <!--  <PropertyGroup Condition=" '$(BuildFlavor)' == 'Current' ">
     <ExcludeCodegenConstants>$(ExcludeCodegenConstants);NETSTANDARD;NETSTANDARD_TODO</ExcludeCodegenConstants>
@@ -51,7 +58,7 @@
       BuildInParallel="false" />
     <MSBuild
       Projects="..\ClientGenerator\ClientGenerator.csproj"
-      Properties="$(MsBuildProperties)"
+      Properties="$(MultiTargetMsBuildProperties)"
       Targets="Restore"
       UnloadProjectsOnCompletion="true"
       UseResultsCache="false"
@@ -89,7 +96,7 @@
       BuildInParallel="false" />
     <MSBuild
       Projects="..\ClientGenerator\ClientGenerator.csproj"
-      Properties="$(MsBuildProperties)"
+      Properties="$(MultiTargetMsBuildProperties)"
       Targets="Build"
       UnloadProjectsOnCompletion="true"
       UseResultsCache="false"
@@ -127,7 +134,7 @@
       BuildInParallel="false" />
     <MSBuild
       Projects="..\ClientGenerator\ClientGenerator.csproj"
-      Properties="$(MsBuildProperties)"
+      Properties="$(MultiTargetMsBuildProperties)"
       Targets="Clean"
       UnloadProjectsOnCompletion="true"
       UseResultsCache="false"
