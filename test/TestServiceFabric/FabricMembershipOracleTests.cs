@@ -22,6 +22,9 @@ namespace TestServiceFabric
 
         private ITestOutputHelper Output { get; }
         private readonly FabricMembershipOracle oracle;
+        private readonly UnknownSiloMonitor unknownSiloMonitor;
+        private readonly ServiceFabricMembershipOptions fabricMembershipOptions;
+
         public FabricMembershipOracleTests(ITestOutputHelper output)
         {
             this.Output = output;
@@ -36,11 +39,14 @@ namespace TestServiceFabric
             globalConfig.MaxMultiClusterGateways = 2;
             globalConfig.ClusterId = "MegaGoodCluster";
 
+            this.fabricMembershipOptions = new ServiceFabricMembershipOptions();
+            this.unknownSiloMonitor = new UnknownSiloMonitor(this.fabricMembershipOptions);
             this.oracle = new FabricMembershipOracle(
                 this.siloDetails,
                 globalConfig,
                 this.resolver,
-                name => new TestOutputLogger(this.Output, name));
+                name => new TestOutputLogger(this.Output, name),
+                this.unknownSiloMonitor);
         }
 
         [Fact]
@@ -182,6 +188,75 @@ namespace TestServiceFabric
             Assert.Contains(this.siloDetails.SiloAddress, multiClusters);
         }
 
+        /// <summary>
+        /// Tests that unknown silos are accounted for when updates occur.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        /// <remarks>
+        /// This is an integration test between <see cref="FabricMembershipOracle"/> and <see cref="UnknownSiloMonitorTests"/>.
+        /// </remarks>
+        [Fact]
+        public async Task UnknownSilosAreAccountedForDuringUpdate()
+        {
+            var now = new[] {DateTime.UtcNow};
+            this.unknownSiloMonitor.GetDateTime = () => now[0];
+
+            var listener = new MockStatusListener();
+            this.oracle.SubscribeToSiloStatusEvents(listener);
+            await this.oracle.Start();
+            await this.oracle.BecomeActive();
+
+            var silos = new[]
+            {
+                CreateSiloInfo(
+                    SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1), 1),
+                    SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2), 1),
+                    "HappyNewSilo"),
+                CreateSiloInfo(
+                    SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 3), 2),
+                    SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 4), 2),
+                    "OtherNewSilo"),
+            };
+
+            this.resolver.Notify(silos);
+            listener.WaitForVersion(4);
+            Assert.Equal(3, listener.Silos.Count);
+
+            // Query for an unknown silo. Doing so should result in the silo being recorded as unknown.
+            var unknownSilo1 = SiloAddress.New(new IPEndPoint(IPAddress.Parse("1.1.1.1"), 3), 3);
+            Assert.Equal(SiloStatus.None, this.oracle.GetApproximateSiloStatus(unknownSilo1));
+            this.resolver.Notify(silos);
+
+            // The status should not have changed.
+            Assert.Equal(SiloStatus.None, this.oracle.GetApproximateSiloStatus(unknownSilo1));
+
+            now[0] += this.fabricMembershipOptions.UnknownSiloRemovalPeriod + TimeSpan.FromMilliseconds(1);
+            this.resolver.Notify(silos);
+            listener.WaitForVersion(5);
+
+            // After the delay, the silo should be declared dead.
+            Assert.Equal(SiloStatus.Dead, this.oracle.GetApproximateSiloStatus(unknownSilo1));
+            
+            // Query for another unknown silo using a different mechanism.
+            var unknownSilo2 = SiloAddress.New(new IPEndPoint(IPAddress.Parse("2.2.2.2"), 4), 4);
+            Assert.Equal(false, this.oracle.IsFunctionalDirectory(unknownSilo2));
+
+            // Report a new silo with the same endpoint as the unknown silo but a higher generation. 
+            silos = new[]
+            {
+                silos[0],
+                silos[1],
+                CreateSiloInfo(
+                    SiloAddress.New(new IPEndPoint(IPAddress.Parse("2.2.2.2"), 4), 5),
+                    SiloAddress.Zero,
+                    "TippyTop")
+            };
+
+            this.resolver.Notify(silos);
+            listener.WaitForVersion(6);
+            Assert.True(this.oracle.IsDeadSilo(unknownSilo2));
+        }
+
         private class MockSiloDetails : ILocalSiloDetails
         {
             public string Name { get; set; }
@@ -255,6 +330,8 @@ namespace TestServiceFabric
             public HashSet<IFabricServiceStatusListener> Handlers { get; } = new HashSet<IFabricServiceStatusListener>();
 
             public int RefreshCalled { get; private set; }
+
+            public bool? IsSingletonPartition => true;
 
             public void Subscribe(IFabricServiceStatusListener handler)
             {

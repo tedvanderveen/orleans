@@ -27,7 +27,7 @@ namespace Microsoft.Orleans.ServiceFabric
         private readonly FabricPartitionResolutionChangeHandler partitionChangeHandler;
         private ServicePartitionSilos[] silos;
         private Dictionary<Guid, long> changeHandlerRegistrations;
-
+        
         /// <summary>
         /// Initializes a new instance of the <see cref="FabricServiceSiloResolver"/> class.
         /// </summary>
@@ -44,29 +44,23 @@ namespace Microsoft.Orleans.ServiceFabric
             this.log = loggerFactory(nameof(FabricServiceSiloResolver));
             this.partitionChangeHandler = this.OnPartitionChange;
         }
-        
-        /// <summary>
-        /// Subscribes the provided handler for update notifications.
-        /// </summary>
-        /// <param name="handler">The update notification handler.</param>
+
+        /// <inheritdoc />
+        public bool? IsSingletonPartition { get; private set; }
+
+        /// <inheritdoc />
         public void Subscribe(IFabricServiceStatusListener handler)
         {
             this.subscribers.TryAdd(handler, handler);
         }
 
-        /// <summary>
-        /// Unsubscribes the provided handler from update notifications.
-        /// </summary>
-        /// <param name="handler">The update notification handler.</param>
+        /// <inheritdoc />
         public void Unsubscribe(IFabricServiceStatusListener handler)
         {
             this.subscribers.TryRemove(handler, out handler);
         }
 
-        /// <summary>
-        /// Forces a refresh of the partitions.
-        /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        /// <inheritdoc />
         public async Task Refresh()
         {
             if (this.log.IsVerbose) this.log.Verbose($"Refreshing silos for service {this.serviceName}");
@@ -74,6 +68,7 @@ namespace Microsoft.Orleans.ServiceFabric
             lock (this.updateLock)
             {
                 this.silos = result;
+                this.IsSingletonPartition = this.silos.FirstOrDefault()?.Partition.Kind == ServicePartitionKind.Singleton;
 
                 // Register for update notifications for each partition.
                 var oldRegistrations = this.changeHandlerRegistrations;

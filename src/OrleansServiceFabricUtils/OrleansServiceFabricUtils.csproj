@@ -47,6 +47,8 @@
     <Compile Include="IFabricServiceSiloResolver.cs" />
     <Compile Include="IFabricServiceStatusListener.cs" />
     <Compile Include="Models\IResolvedServicePartition.cs" />
+    <Compile Include="ServiceFabricMembershipOptions.cs" />
+    <Compile Include="UnknownSiloMonitor.cs" />
     <Compile Include="Utilities\ErrorCode.cs" />
     <Compile Include="Utilities\ResolvedServicePartitionExtensions.cs" />
     <Compile Include="Utilities\ServiceFabricExtensions.cs" />
