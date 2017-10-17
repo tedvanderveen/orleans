@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Orleans.ServiceFabric;
 using Microsoft.Orleans.ServiceFabric.Models;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Xunit;
@@ -40,12 +41,13 @@ namespace TestServiceFabric
             globalConfig.ClusterId = "MegaGoodCluster";
 
             this.fabricMembershipOptions = new ServiceFabricMembershipOptions();
-            this.unknownSiloMonitor = new UnknownSiloMonitor(this.fabricMembershipOptions);
+            Logger LoggerFactory(string name) => new TestOutputLogger(this.Output, name);
+            this.unknownSiloMonitor = new UnknownSiloMonitor(this.fabricMembershipOptions, LoggerFactory);
             this.oracle = new FabricMembershipOracle(
                 this.siloDetails,
                 globalConfig,
                 this.resolver,
-                name => new TestOutputLogger(this.Output, name),
+                LoggerFactory,
                 this.unknownSiloMonitor);
         }
 

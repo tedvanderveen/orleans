@@ -114,7 +114,7 @@ namespace Microsoft.Orleans.ServiceFabric
             var exists = allSilos.TryGetValue(siloAddress, out var status);
             if (!exists)
             {
-                this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
+                this.ReportUnknownSilo(siloAddress);
             }
 
             return exists ? status : SiloStatus.None;
@@ -166,7 +166,7 @@ namespace Microsoft.Orleans.ServiceFabric
             if (siloAddress.Equals(this.SiloAddress)) return true;
 
             var status = this.GetApproximateSiloStatus(siloAddress);
-            return status != SiloStatus.None && !status.IsTerminating();
+            return !status.IsUnavailable();
         }
 
         /// <inheritdoc />
@@ -227,10 +227,16 @@ namespace Microsoft.Orleans.ServiceFabric
             siloName = entry?.Name;
             if (!result)
             {
-                this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
+                this.ReportUnknownSilo(siloAddress);
             }
 
             return result;
+        }
+
+        private void ReportUnknownSilo(SiloAddress siloAddress)
+        {
+            this.log.Info($"Recording unknown silo {siloAddress}.");
+            this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
         }
 
         /// <inheritdoc />

@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
+using Orleans;
 using Orleans.Runtime;
 
 namespace Microsoft.Orleans.ServiceFabric
@@ -16,10 +17,12 @@ namespace Microsoft.Orleans.ServiceFabric
         /// </summary>
         private readonly ConcurrentDictionary<SiloAddress, DateTime> unknownSilos = new ConcurrentDictionary<SiloAddress, DateTime>();
         private readonly ServiceFabricMembershipOptions options;
+        private readonly Logger log;
 
-        public UnknownSiloMonitor(ServiceFabricMembershipOptions options)
+        public UnknownSiloMonitor(ServiceFabricMembershipOptions options, Factory<string, Logger> logFactory)
         {
             this.options = options;
+            this.log = logFactory(nameof(UnknownSiloMonitor));
         }
 
         /// <summary>
@@ -75,6 +78,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 // If a known silo exists on the endpoint with a higher generation, the old silo must be dead.
                 if (latestGenerations.TryGetValue(unknownSilo.Endpoint, out var knownGeneration) && knownGeneration > unknownSilo.Generation)
                 {
+                    this.log.Info($"Unknown silo {unknownSilo} was superseded by later generation on same endpoint {SiloAddress.New(unknownSilo.Endpoint, knownGeneration)}.");
                     updates.Add(unknownSilo);
                 }
 
@@ -86,6 +90,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     {
                         if (unknownSilo.Endpoint.Address.Equals(knownSilo.Key.Address) && knownSilo.Value > unknownSilo.Generation)
                         {
+                            this.log.Info($"Unknown silo {unknownSilo} was superseded by {knownSilo}.");
                             updates.Add(unknownSilo);
                         }
                     }
@@ -94,6 +99,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 // Silos which have been in an unknown state for more than configured maximum allowed time are automatically considered dead.
                 if (this.GetDateTime() - pair.Value > this.options.UnknownSiloRemovalPeriod)
                 {
+                    this.log.Info($"Unknown silo {unknownSilo} declared dead after {this.options.UnknownSiloRemovalPeriod}.");
                     updates.Add(unknownSilo);
                 }
             }

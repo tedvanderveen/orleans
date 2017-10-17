@@ -4,6 +4,7 @@ using System.Net;
 using Microsoft.Orleans.ServiceFabric;
 using Orleans.Runtime;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace TestServiceFabric
 {
@@ -13,6 +14,15 @@ namespace TestServiceFabric
     [TestCategory("ServiceFabric"), TestCategory("BVT")]
     public class UnknownSiloMonitorTests
     {
+        private readonly ITestOutputHelper output;
+
+        public UnknownSiloMonitorTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
+        private Logger LoggerFactory(string name) => new TestOutputLogger(this.output, name);
+
         /// <summary>
         /// Tests that unknown silos are declared dead after a configured period of time.
         /// </summary>
@@ -25,7 +35,7 @@ namespace TestServiceFabric
         {
             var now = new[] { DateTime.UtcNow };
             var options = new ServiceFabricMembershipOptions();
-            var monitor = new UnknownSiloMonitor(options)
+            var monitor = new UnknownSiloMonitor(options, this.LoggerFactory)
             {
                 GetDateTime = () => now[0]
             };
@@ -63,7 +73,7 @@ namespace TestServiceFabric
         {
             var now = new[] { DateTime.UtcNow };
             var options = new ServiceFabricMembershipOptions();
-            var monitor = new UnknownSiloMonitor(options)
+            var monitor = new UnknownSiloMonitor(options, this.LoggerFactory)
             {
                 GetDateTime = () => now[0]
             };
@@ -108,7 +118,7 @@ namespace TestServiceFabric
         {
             var now = new[] { DateTime.UtcNow };
             var options = new ServiceFabricMembershipOptions();
-            var monitor = new UnknownSiloMonitor(options)
+            var monitor = new UnknownSiloMonitor(options, this.LoggerFactory)
             {
                 GetDateTime = () => now[0]
             };
