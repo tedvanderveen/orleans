@@ -133,6 +133,7 @@ namespace Microsoft.Orleans.ServiceFabric.Utilities
                     cancellationToken);
             }
 
+            // Cache the results of this resolution to provide to the next resolution call.
             cache.AddOrUpdate(
                 partitionKey,
                 _ => result,

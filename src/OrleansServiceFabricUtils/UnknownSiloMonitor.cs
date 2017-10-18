@@ -38,9 +38,10 @@ namespace Microsoft.Orleans.ServiceFabric
         /// Adds an unknown silo to monitor.
         /// </summary>
         /// <param name="address">The silo address.</param>
-        public void ReportUnknownSilo(SiloAddress address)
+        /// <returns><see langword="true"/> if the silo was added as an unknown silo, <see langword="false"/> otherwise.</returns>
+        public bool ReportUnknownSilo(SiloAddress address)
         {
-            this.unknownSilos.TryAdd(address, this.GetDateTime());
+            return this.unknownSilos.TryAdd(address, this.GetDateTime());
         }
 
         /// <summary>

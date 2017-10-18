@@ -235,8 +235,10 @@ namespace Microsoft.Orleans.ServiceFabric
 
         private void ReportUnknownSilo(SiloAddress siloAddress)
         {
-            this.log.Info($"Recording unknown silo {siloAddress}.");
-            this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
+            if (this.unknownSiloMonitor.ReportUnknownSilo(siloAddress))
+            {
+                this.log.Info($"Recording unknown silo {siloAddress}.");
+            }
         }
 
         /// <inheritdoc />
