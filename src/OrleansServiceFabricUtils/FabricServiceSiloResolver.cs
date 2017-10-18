@@ -146,7 +146,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     (int) ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
                     $"Received update for partition {updated.Partition}, but found no matching partition. Known partitions: {knownPartitions}");
             }
-            else if (this.log.IsVerbose2)
+            else if (this.log.IsVerbose)
             {
                 var newSilos = new StringBuilder();
                 foreach (var silo in updated.Silos)
@@ -154,7 +154,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     newSilos.Append($"\n* {silo}");
                 }
 
-                this.log.Verbose2($"Received update for partition {updated.Partition}. Updated values:{newSilos}");
+                this.log.Verbose($"Received update for partition {updated.Partition}. Updated values: {newSilos}");
             }
         }
 

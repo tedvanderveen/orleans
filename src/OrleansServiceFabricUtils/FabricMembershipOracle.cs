@@ -18,7 +18,6 @@ namespace Microsoft.Orleans.ServiceFabric
         private readonly Dictionary<SiloAddress, SiloEntry> silos = new Dictionary<SiloAddress, SiloEntry>();
         private readonly ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener> subscribers =
             new ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener>();
-
         private readonly AutoResetEvent notificationEvent = new AutoResetEvent(false);
         private readonly BlockingCollection<StatusChangeNotification> notifications = new BlockingCollection<StatusChangeNotification>();
         private readonly TimeSpan refreshPeriod = TimeSpan.FromSeconds(5);
@@ -114,7 +113,7 @@ namespace Microsoft.Orleans.ServiceFabric
             var exists = allSilos.TryGetValue(siloAddress, out var status);
             if (!exists)
             {
-                this.ReportUnknownSilo(siloAddress);
+                this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
             }
 
             return exists ? status : SiloStatus.None;
@@ -227,18 +226,10 @@ namespace Microsoft.Orleans.ServiceFabric
             siloName = entry?.Name;
             if (!result)
             {
-                this.ReportUnknownSilo(siloAddress);
+                this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
             }
 
             return result;
-        }
-
-        private void ReportUnknownSilo(SiloAddress siloAddress)
-        {
-            if (this.unknownSiloMonitor.ReportUnknownSilo(siloAddress))
-            {
-                this.log.Info($"Recording unknown silo {siloAddress}.");
-            }
         }
 
         /// <inheritdoc />
@@ -318,8 +309,6 @@ namespace Microsoft.Orleans.ServiceFabric
                 var singleton = this.fabricServiceSiloResolver.IsSingletonPartition.HasValue && this.fabricServiceSiloResolver.IsSingletonPartition.Value;
                 foreach (var deadSilo in this.unknownSiloMonitor.DetermineDeadSilos(this.GetApproximateSiloStatuses(true), singleton))
                 {
-                    this.log.Info($"Determined that silo {deadSilo} is dead.");
-
                     if (this.silos.TryGetValue(deadSilo, out var entry))
                     {
                         entry.Status = SiloStatus.Dead;

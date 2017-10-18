@@ -37,11 +37,14 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <summary>
         /// Adds an unknown silo to monitor.
         /// </summary>
-        /// <param name="address">The silo address.</param>
+        /// <param name="siloAddress">The silo address.</param>
         /// <returns><see langword="true"/> if the silo was added as an unknown silo, <see langword="false"/> otherwise.</returns>
-        public bool ReportUnknownSilo(SiloAddress address)
+        public void ReportUnknownSilo(SiloAddress siloAddress)
         {
-            return this.unknownSilos.TryAdd(address, this.GetDateTime());
+            if (this.unknownSilos.TryAdd(siloAddress, this.GetDateTime()))
+            {
+                this.log.Info($"Recording unknown silo {siloAddress}.");
+            }
         }
 
         /// <summary>
@@ -67,10 +70,14 @@ namespace Microsoft.Orleans.ServiceFabric
                 {
                     latestGenerations[endpoint] = address.Generation;
                 }
-
-                this.unknownSilos.TryRemove(address, out var _);
+                
+                // Unknown silos are not removed from the collection until they have been confirmed in the collection of known silos.
+                if (this.unknownSilos.TryRemove(address, out var _))
+                {
+                    this.log.Info($"Previously unknown silo {address} has transitioned to state {known.Value}.");
+                }
             }
-
+            
             var updates = new List<SiloAddress>();
             foreach (var pair in this.unknownSilos)
             {
@@ -79,7 +86,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 // If a known silo exists on the endpoint with a higher generation, the old silo must be dead.
                 if (latestGenerations.TryGetValue(unknownSilo.Endpoint, out var knownGeneration) && knownGeneration > unknownSilo.Generation)
                 {
-                    this.log.Info($"Unknown silo {unknownSilo} was superseded by later generation on same endpoint {SiloAddress.New(unknownSilo.Endpoint, knownGeneration)}.");
+                    this.log.Info($"Previously unknown silo {unknownSilo} was superseded by later generation on same endpoint {SiloAddress.New(unknownSilo.Endpoint, knownGeneration)}.");
                     updates.Add(unknownSilo);
                 }
 
@@ -91,7 +98,7 @@ namespace Microsoft.Orleans.ServiceFabric
                     {
                         if (unknownSilo.Endpoint.Address.Equals(knownSilo.Key.Address) && knownSilo.Value > unknownSilo.Generation)
                         {
-                            this.log.Info($"Unknown silo {unknownSilo} was superseded by {knownSilo}.");
+                            this.log.Info($"Previously unknown silo {unknownSilo} was superseded by {knownSilo}.");
                             updates.Add(unknownSilo);
                         }
                     }
@@ -100,9 +107,14 @@ namespace Microsoft.Orleans.ServiceFabric
                 // Silos which have been in an unknown state for more than configured maximum allowed time are automatically considered dead.
                 if (this.GetDateTime() - pair.Value > this.options.UnknownSiloRemovalPeriod)
                 {
-                    this.log.Info($"Unknown silo {unknownSilo} declared dead after {this.options.UnknownSiloRemovalPeriod}.");
+                    this.log.Info($"Previously unknown silo {unknownSilo} declared dead after {this.options.UnknownSiloRemovalPeriod.TotalSeconds} seconds.");
                     updates.Add(unknownSilo);
                 }
+            }
+
+            if (this.unknownSilos.Count == 0 && updates.Count == 0)
+            {
+                this.log.Info("All unknown silos have been identified.");
             }
 
             return updates;
