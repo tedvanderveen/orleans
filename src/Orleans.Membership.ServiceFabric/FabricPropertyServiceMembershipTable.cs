@@ -16,7 +16,11 @@ namespace Microsoft.Orleans.ServiceFabric
     using Newtonsoft.Json.Converters;
     using Newtonsoft.Json.Linq;
 
-    public class ServiceFabricNamingServiceGatewayProvider : IMembershipTable, IGatewayListProvider
+    public class ServiceFabricNamingServiceMembershipTable : IMembershipTable
+    {
+        
+    }
+    internal class NamingServiceClusterProvider : IMembershipTable, IGatewayListProvider
     {
         private const string VersionPropertyName = "VERSION";
 
@@ -51,7 +55,7 @@ namespace Microsoft.Orleans.ServiceFabric
             return Task.FromResult(0);
         }
 
-        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, Logger logger)
+        public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             this.Initialize(logger, config.DeploymentId);
             this.log = logger;
