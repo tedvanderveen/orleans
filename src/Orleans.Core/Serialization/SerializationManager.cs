@@ -1879,6 +1879,10 @@ namespace Orleans.Serialization
                     }
                 });
 
+            var dotNetSerializableSerializer = new DotNetSerializableSerializer();
+            this.orderedKeyedSerializers.Add(dotNetSerializableSerializer);
+            this.keyedSerializers[dotNetSerializableSerializer.SerializerId] = dotNetSerializableSerializer;
+
             var ilSerializer = (IKeyedSerializer)new ILBasedSerializer(this.typeResolver);
             this.orderedKeyedSerializers.Add(ilSerializer);
             this.keyedSerializers[ilSerializer.SerializerId] = ilSerializer;

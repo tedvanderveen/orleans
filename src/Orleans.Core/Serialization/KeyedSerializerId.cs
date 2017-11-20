@@ -11,6 +11,11 @@
         ILBasedSerializer = 1,
 
         /// <summary>
+        /// <see cref="Orleans.Serialization.DotNetSerializableSerializer"/>
+        /// </summary>
+        DotNetSerializableSerializer = 2,
+
+        /// <summary>
         /// The maximum reserved value.
         /// </summary>
         MaxReservedValue = 100,

@@ -922,7 +922,7 @@ namespace UnitTests.Serialization
             public int AnotherValueType;
         }
 
-        internal object OrleansSerializationLoop(SerializationManager serializationManager, object input, bool includeWire = true)
+        internal static object OrleansSerializationLoop(SerializationManager serializationManager, object input, bool includeWire = true)
         {
             var copy = serializationManager.DeepCopy(input);
             if (includeWire)
@@ -932,7 +932,7 @@ namespace UnitTests.Serialization
             return copy;
         }
 
-        private object DotNetSerializationLoop(object input, SerializationManager serializationManager, IGrainFactory grainFactory)
+        internal static object DotNetSerializationLoop(object input, SerializationManager serializationManager, IGrainFactory grainFactory)
         {
             byte[] bytes;
             object deserialized;
