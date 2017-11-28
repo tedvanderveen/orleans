@@ -233,7 +233,7 @@ namespace Orleans.Runtime
                     "Attempt to invoke Dispatcher.SendRejectionMessage() for a message that isn't a rejection.");
             }
         }
-        
+
         private void ReceiveResponse(Message message, ActivationData targetActivation)
         {
             lock (targetActivation)
