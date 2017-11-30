@@ -2,7 +2,9 @@
 using System;
 using System.Threading.Tasks;
 using HelloWorld.Grains;
+using HelloWorld.Interfaces;
 using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Hosting;
 
 namespace OrleansSiloHost
@@ -41,7 +43,11 @@ namespace OrleansSiloHost
 
             var builder = new SiloHostBuilder()
                 .UseConfiguration(config)
-                .AddApplicationPartsFromReferences(typeof(HelloGrain).Assembly)
+                .ConfigureApplicationParts(
+                    p =>
+                        p.AddApplicationPart(typeof(HelloGrain).Assembly)
+                         .AddApplicationPart(typeof(IHello).Assembly)
+                         .WithCodeGeneration())
                 .ConfigureLogging(logging => logging.AddConsole());
 
             var host = builder.Build();

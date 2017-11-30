@@ -5,6 +5,7 @@ using Orleans.Runtime.Configuration;
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Hosting;
 
 namespace OrleansClient
 {
@@ -48,7 +49,7 @@ namespace OrleansClient
                     var config = ClientConfiguration.LocalhostSilo();
                     client = new ClientBuilder()
                         .UseConfiguration(config)
-                        .AddApplicationPartsFromReferences(typeof(IHello).Assembly)
+                        .ConfigureApplicationParts(p => p.AddApplicationPart(typeof(IHello).Assembly).WithCodeGeneration())
                         .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 
