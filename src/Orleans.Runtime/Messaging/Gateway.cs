@@ -530,6 +530,10 @@ namespace Orleans.Runtime.Messaging
                     sendErrorStr = String.Format("Exception sending to client at {0}: {1}", remoteEndpoint, exc);
                     Log.Warn(ErrorCode.GatewayExceptionSendingToClient, sendErrorStr, exc);
                 }
+                finally
+                {
+                    ObjectPools.SegmentListPool.Return(data);
+                }
                 MessagingStatisticsGroup.OnMessageSend(msg.TargetSilo, msg.Direction, bytesSent, headerLength, SocketDirection.GatewayToClient);
                 bool sendError = exceptionSending || countMismatchSending;
                 if (sendError)

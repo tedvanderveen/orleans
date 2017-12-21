@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Microsoft.Extensions.ObjectPool;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
@@ -8,6 +9,36 @@ using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
+
+    internal static class ObjectPools
+    {
+        public static readonly ObjectPool<List<ArraySegment<byte>>> SegmentListPool =
+            new DefaultObjectPool<List<ArraySegment<byte>>>(
+                Policy(
+                    () => new List<ArraySegment<byte>>(8),
+                    obj =>
+                    {
+                        obj.Clear();
+                        return true;
+                    }));
+
+        private static IPooledObjectPolicy<T> Policy<T>(Func<T> create, Func<T, bool> release) => new PoolPolicy<T>(create, release);
+        private class PoolPolicy<T> : IPooledObjectPolicy<T>
+        {
+            private readonly Func<T> create;
+            private readonly Func<T, bool> release;
+
+            public PoolPolicy(Func<T> create, Func<T, bool> release)
+            {
+                this.create = create;
+                this.release = release;
+            }
+
+            public T Create() => this.create();
+
+            public bool Return(T obj) => this.release(obj);
+        }
+    }
     internal class Message : IOutgoingMessage
     {
         public const int LENGTH_HEADER_SIZE = 8;
@@ -484,6 +515,7 @@ namespace Orleans.Runtime
 
         #region Serialization
 
+
         public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
         {
             var context = new SerializationContext(serializationManager)
@@ -511,10 +543,17 @@ namespace Orleans.Runtime
             int headerLength = context.StreamWriter.CurrentOffset;
             int bodyLength = BufferLength(bodyBytes);
 
-            var bytes = new List<ArraySegment<byte>>();
-            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
-            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
-           
+            var bytes = ObjectPools.SegmentListPool.Get();
+            var pool = BufferPool.GlobalPool;
+            if (pool.Size > sizeof(int) + sizeof(int))
+            {
+                this.lengthBytes = BufferPool.GlobalPool.GetBuffer();
+                NoAllocBitConverter.GetBytes(headerLength, lengthBytes, 0);
+                NoAllocBitConverter.GetBytes(bodyLength, lengthBytes, sizeof(int));
+                var lengthSegment = new ArraySegment<byte>(lengthBytes, 0, sizeof(int) + sizeof(int));
+                bytes.Add(lengthSegment);
+            }
+
             bytes.AddRange(headerBytes);
             bytes.AddRange(bodyBytes);
 
@@ -522,7 +561,6 @@ namespace Orleans.Runtime
             bodyLengthOut = bodyLength;
             return bytes;
         }
-
 
         public void ReleaseBodyAndHeaderBuffers()
         {
@@ -532,10 +570,17 @@ namespace Orleans.Runtime
 
         public void ReleaseHeadersOnly()
         {
-            if (headerBytes == null) return;
+            if (lengthBytes != null)
+            {
+                BufferPool.GlobalPool.Release(lengthBytes);
+                lengthBytes = null;
+            }
 
-            BufferPool.GlobalPool.Release(headerBytes);
-            headerBytes = null;
+            if (headerBytes != null)
+            {
+                BufferPool.GlobalPool.Release(headerBytes);
+                headerBytes = null;
+            }
         }
 
         public void ReleaseBodyOnly()
@@ -677,6 +722,7 @@ namespace Orleans.Runtime
 
         // For statistical measuring of time spent in queues.
         private ITimeInterval timeInterval;
+        private byte[] lengthBytes;
 
         public void Start()
         {
@@ -1376,6 +1422,17 @@ namespace Orleans.Runtime
             {
                 var des = context.GetSerializationManager().GetDeserializer(t);
                 return des.Invoke(t, context);
+            }
+        }
+    }
+
+    internal static class NoAllocBitConverter
+    {
+        public static unsafe void GetBytes(int value, byte[] bytes, int offset)
+        {
+            fixed (byte* b = bytes)
+            {
+                *(int*)(b + offset) = value;
             }
         }
     }

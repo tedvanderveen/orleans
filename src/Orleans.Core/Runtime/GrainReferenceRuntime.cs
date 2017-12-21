@@ -10,7 +10,7 @@ namespace Orleans.Runtime
 {
     internal class GrainReferenceRuntime : IGrainReferenceRuntime
     {
-        private const bool USE_DEBUG_CONTEXT = true;
+        private const bool USE_DEBUG_CONTEXT = false;
         private const bool USE_DEBUG_CONTEXT_PARAMS = false;
         private static ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
 
@@ -75,8 +75,7 @@ namespace Orleans.Runtime
 
                 return Task.FromResult(default(T));
             }
-
-            resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
+            
             return resultTask.ToTypedTask<T>();
         }
 
@@ -112,7 +111,7 @@ namespace Orleans.Runtime
 
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
-            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
+            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.RuntimeClient.SendRequest(reference, request, resolver, this.responseCallbackDelegate, debugContext, options, reference.GenericArguments);
             return isOneWayCall ? null : resolver.Task;
         }

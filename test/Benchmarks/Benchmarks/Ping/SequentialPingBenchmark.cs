@@ -5,6 +5,7 @@ using System.Linq;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
+using BenchmarkDotNet.Jobs;
 using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Ping;
 using Benchmarks.Serialization;
@@ -15,6 +16,7 @@ namespace Benchmarks.Ping
     {
         public SequentialPingBenchmarkConfig()
         {
+            Add(Job.ShortRun);
             Add(new MemoryDiagnoser());
         }
     }

@@ -88,6 +88,11 @@ namespace Orleans.Messaging
                     Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
                 }
             }
+            finally
+            {
+                ObjectPools.SegmentListPool.Return(data);
+            }
+
             MessagingStatisticsGroup.OnMessageSend(targetSilo, msg.Direction, bytesSent, headerLength, GetSocketDirection());
             bool sendError = exceptionSending || countMismatchSending;
             if (sendError)
