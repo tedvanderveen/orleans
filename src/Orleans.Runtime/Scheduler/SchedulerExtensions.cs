@@ -26,6 +26,13 @@ namespace Orleans.Runtime.Scheduler
             return workItem.Task;
         }
 
+        internal static Task QueueNamedTask<TState>(this OrleansTaskScheduler scheduler, Func<TState, Task> taskFunc, ISchedulingContext targetContext, TState state, string activityName = null)
+        {
+            var workItem = new AsyncClosureWorkItemWithState<TState>(taskFunc, state, activityName);
+            scheduler.QueueWorkItem(workItem, targetContext);
+            return workItem.Task;
+        }
+
         internal static Task QueueAction(this OrleansTaskScheduler scheduler, Action action, ISchedulingContext targetContext)
         {
             var resolver = new TaskCompletionSource<bool>();

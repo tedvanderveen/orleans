@@ -167,6 +167,53 @@ namespace Orleans.Runtime.Scheduler
         public override WorkItemType ItemType => WorkItemType.Closure;
     }
 
+    internal class AsyncClosureWorkItemWithState<TState> : WorkItemBase
+    {
+        private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();
+        private readonly Func<TState, Task> continuation;
+        private readonly TState state;
+        private readonly string name;
+
+        public override string Name => this.name ?? ClosureWorkItem.GetMethodName(this.continuation);
+        public Task Task => this.completion.Task;
+
+        public AsyncClosureWorkItemWithState(Func<TState, Task> closure, TState state, string name = null)
+        {
+            this.continuation = closure;
+            this.state = state;
+            this.name = name;
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectGlobalShedulerStats)
+            {
+                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
+            }
+#endif
+        }
+
+        public override async void Execute()
+        {
+#if TRACK_DETAILED_STATS
+            if (StatisticsCollector.CollectGlobalShedulerStats)
+            {
+                SchedulerStatisticsGroup.OnClosureWorkItemsExecuted();
+            }
+#endif
+
+            try
+            {
+                RequestContext.Clear();
+                await this.continuation(this.state);
+                this.completion.TrySetResult(true);
+            }
+            catch (Exception exception)
+            {
+                this.completion.TrySetException(exception);
+            }
+        }
+
+        public override WorkItemType ItemType => WorkItemType.Closure;
+    }
+
     internal class AsyncClosureWorkItem<T> : WorkItemBase
     {
         private readonly TaskCompletionSource<T> completion = new TaskCompletionSource<T>();

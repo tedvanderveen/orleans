@@ -20,6 +20,7 @@ namespace Orleans.Runtime
         private Task currentlyExecutingTickTask;
         private readonly OrleansTaskScheduler scheduler;
         private readonly IActivationData activationData;
+        private readonly Func<object, Task> timerTickFunc;
 
         public string Name { get; }
         
@@ -41,6 +42,7 @@ namespace Orleans.Runtime
             timerFrequency = period;
             previousTickTime = DateTime.UtcNow;
             totalNumTicks = 0;
+            timerTickFunc = s => ForwardToAsyncCallback(s);
         }
 
         internal static GrainTimer FromTimerCallback(
@@ -101,7 +103,7 @@ namespace Orleans.Runtime
             try
             {
                 // Schedule call back to grain context
-                await this.scheduler.QueueNamedTask(() => ForwardToAsyncCallback(state), context, this.Name);
+                await this.scheduler.QueueNamedTask(timerTickFunc, context, state, this.Name);
             }
             catch (InvalidSchedulingContextException exc)
             {
