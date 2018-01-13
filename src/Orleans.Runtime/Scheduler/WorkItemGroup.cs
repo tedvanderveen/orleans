@@ -30,6 +30,7 @@ namespace Orleans.Runtime.Scheduler
         private TimeSpan totalQueuingDelay;
         private readonly long quantumExpirations;
         private readonly int workItemGroupStatisticsNumber;
+        private readonly Stopwatch executionStopwatch;
 
         internal ActivationTaskScheduler TaskRunner { get; private set; }
         
@@ -164,6 +165,8 @@ namespace Orleans.Runtime.Scheduler
                         return sb.ToString();
                     });
             }
+
+            executionStopwatch = new Stopwatch();
         }
 
         /// <summary>
@@ -288,8 +291,7 @@ namespace Orleans.Runtime.Scheduler
             {
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 int count = 0;
-                var stopwatch = new Stopwatch();
-                stopwatch.Start();
+                executionStopwatch.Restart();
                 do 
                 {
                     lock (lockable)
@@ -333,7 +335,7 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
                     if (log.IsEnabled(LogLevel.Trace)) log.Trace("About to execute task {0} in SchedulingContext={1}", task, SchedulingContext);
 #endif
-                    var taskStart = stopwatch.Elapsed;
+                    var taskStart = executionStopwatch.Elapsed;
 
                     try
                     {
@@ -359,7 +361,7 @@ namespace Orleans.Runtime.Scheduler
                             thread.threadTracking.IncrementNumberOfProcessed();
 #endif
                         totalItemsProcessed++;
-                        var taskLength = stopwatch.Elapsed - taskStart;
+                        var taskLength = executionStopwatch.Elapsed - taskStart;
                         if (taskLength > OrleansTaskScheduler.TurnWarningLengthThreshold)
                         {
                             SchedulerStatisticsGroup.NumLongRunningTurns.Increment();
@@ -371,8 +373,8 @@ namespace Orleans.Runtime.Scheduler
                     count++;
                 } 
                 while (((MaxWorkItemsPerTurn <= 0) || (count <= MaxWorkItemsPerTurn)) &&
-                    ((ActivationSchedulingQuantum <= TimeSpan.Zero) || (stopwatch.Elapsed < ActivationSchedulingQuantum)));
-                stopwatch.Stop();
+                    ((ActivationSchedulingQuantum <= TimeSpan.Zero) || (executionStopwatch.Elapsed < ActivationSchedulingQuantum)));
+                executionStopwatch.Stop();
             }
             catch (Exception ex)
             {
