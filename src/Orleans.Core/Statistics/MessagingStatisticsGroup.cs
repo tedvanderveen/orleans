@@ -172,7 +172,7 @@ namespace Orleans.Runtime
             TotalBytesSent.IncrementBy(numTotalBytes);
             HeaderBytesSent.IncrementBy(headerBytes);
             sentMsgSizeHistogram.AddData(numTotalBytes);
-            FindCounter(perSiloSendCounters, new StatisticName(StatisticNames.MESSAGING_SENT_MESSAGES_PER_SILO, (targetSilo != null ? targetSilo.ToString() : "Null")), CounterStorage.LogOnly).IncrementBy(numMsgsInBatch);
+           // FindCounter(perSiloSendCounters, new StatisticName(StatisticNames.MESSAGING_SENT_MESSAGES_PER_SILO, (targetSilo != null ? targetSilo.ToString() : "Null")), CounterStorage.LogOnly).IncrementBy(numMsgsInBatch);
         }
 
         private static CounterStatistic FindCounter(ConcurrentDictionary<string, CounterStatistic> counters, StatisticName name, CounterStorage storage)
@@ -195,7 +195,7 @@ namespace Orleans.Runtime
             headerBytesReceived.IncrementBy(headerBytes);
             receiveMsgSizeHistogram.AddData(headerBytes + bodyBytes);
             SiloAddress addr = msg.SendingSilo;
-            FindCounter(perSiloReceiveCounters, new StatisticName(StatisticNames.MESSAGING_RECEIVED_MESSAGES_PER_SILO, (addr != null ? addr.ToString() : "Null")), CounterStorage.LogOnly).Increment();
+            //FindCounter(perSiloReceiveCounters, new StatisticName(StatisticNames.MESSAGING_RECEIVED_MESSAGES_PER_SILO, (addr != null ? addr.ToString() : "Null")), CounterStorage.LogOnly).Increment();
         }
 
         internal static void OnMessageBatchReceive(SocketDirection socketDirection, int numMsgsInBatch, int totalBytes)
