@@ -223,21 +223,15 @@ namespace Orleans.Runtime.Scheduler
                 return;
             }
 
-            workItem.SchedulingContext = context;
-
             // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
             // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
-            if (workItemGroup == null)
-            {
-                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, this);
-                t.Start(this);
-            }
-            else
-            {
-                // Create Task wrapper for this work item
-                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, workItemGroup.TaskRunner);
-                t.Start(workItemGroup.TaskRunner);
-            }
+            var scheduler = workItemGroup?.TaskRunner as TaskScheduler ?? this;
+
+            workItem.SchedulingContext = context;
+            workItem.Scheduler = scheduler;
+
+            var task = workItem as Task ?? TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, scheduler);
+            task.Start(scheduler);
         }
 
         // Only required if you have work groups flagged by a context that is not a WorkGroupingContext

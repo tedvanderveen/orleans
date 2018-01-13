@@ -11,6 +11,14 @@ namespace Orleans.Runtime.Scheduler
         private readonly Message message;
         private readonly Dispatcher dispatcher;
 
+        private static readonly Action<Task, object> InvokeContinuation = (t, obj) =>
+        {
+            var self = (InvokeWorkItem) obj;
+            // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault
+            self.activation.DecrementInFlightCount();
+            self.dispatcher.OnActivationCompletedRequest(self.activation, self.message);
+        };
+
         public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher, ILogger logger)
         {
             this.logger = logger;
@@ -47,12 +55,7 @@ namespace Orleans.Runtime.Scheduler
                 var grain = activation.GrainInstance;
                 var runtimeClient = this.dispatcher.RuntimeClient;
                 Task task = runtimeClient.Invoke(grain, this.activation, this.message);
-                task.ContinueWith(t =>
-                {
-                    // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault
-                    activation.DecrementInFlightCount();
-                    this.dispatcher.OnActivationCompletedRequest(activation, message);
-                }).Ignore();
+                task.ContinueWith(InvokeContinuation, this).Ignore();
             }
             catch (Exception exc)
             {

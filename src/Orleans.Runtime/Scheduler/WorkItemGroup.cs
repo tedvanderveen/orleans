@@ -48,6 +48,12 @@ namespace Orleans.Runtime.Scheduler
             get { return SchedulingUtils.IsSystemPriorityContext(SchedulingContext); }
         }
 
+        public TaskScheduler Scheduler
+        {
+            get => this.TaskRunner;
+            set => this.TaskRunner = (ActivationTaskScheduler) value;
+        }
+
         internal bool IsSystemGroup
         {
             get { return SchedulingUtils.IsSystemContext(SchedulingContext); }

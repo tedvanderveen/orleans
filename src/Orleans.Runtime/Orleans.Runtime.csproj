@@ -19,4 +19,10 @@
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="ThisTask">
+      <HintPath>..\ThisTask\ThisTask.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>

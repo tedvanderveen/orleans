@@ -113,4 +113,10 @@
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="ThisTask">
+      <HintPath>..\..\src\ThisTask\ThisTask.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>

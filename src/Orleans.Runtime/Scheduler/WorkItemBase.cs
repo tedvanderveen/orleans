@@ -1,11 +1,13 @@
 using System;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Scheduler
 {
-    internal abstract class WorkItemBase : IWorkItem
+    internal abstract class WorkItemBase : ThisTask.ThisTask, IWorkItem
     {
+        private static readonly Action<object> Action = obj => ((IWorkItem)obj).Execute();
 
-        internal protected WorkItemBase()
+        internal protected WorkItemBase() : base(Action)
         {
         }
 
@@ -27,6 +29,8 @@ namespace Orleans.Runtime.Scheduler
         {
             get { return SchedulingUtils.IsSystemPriorityContext(this.SchedulingContext); }
         }
+
+        public TaskScheduler Scheduler { get; set; }
 
         public override string ToString()
         {

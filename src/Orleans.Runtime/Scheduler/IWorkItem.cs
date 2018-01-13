@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 
 namespace Orleans.Runtime.Scheduler
@@ -11,6 +12,7 @@ namespace Orleans.Runtime.Scheduler
         TimeSpan TimeSinceQueued { get; }
         DateTime TimeQueued { get; set;  }
         bool IsSystemPriority { get; }
+        TaskScheduler Scheduler { get; set; }
         void Execute();
     }
 }
