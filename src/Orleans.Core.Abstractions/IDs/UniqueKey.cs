@@ -25,10 +25,10 @@ namespace Orleans.Runtime
             GeoClient = 7,
         }
 
-        public UInt64 N0 { get; private set; }
-        public UInt64 N1 { get; private set; }
-        public UInt64 TypeCodeData { get; private set; }
-        public string KeyExt { get; private set; }
+        public UInt64 N0 { get; }
+        public UInt64 N1 { get; }
+        public UInt64 TypeCodeData { get; }
+        public string KeyExt { get; }
 
         [NonSerialized]
         private uint uniformHashCache;
@@ -67,14 +67,16 @@ namespace Orleans.Runtime
             }
         }
 
-        internal static readonly UniqueKey Empty =
-            new UniqueKey
-            {
-                N0 = 0,
-                N1 = 0,
-                TypeCodeData = 0,
-                KeyExt = null
-            };
+        internal static readonly UniqueKey Empty = new UniqueKey();
+        private UniqueKey() { }
+
+        private UniqueKey(ulong n0, ulong n1, ulong typeCodeData, string keyExt) : this()
+        {
+            N0 = n0;
+            N1 = n1;
+            TypeCodeData = typeCodeData;
+            KeyExt = keyExt;
+        }
 
         internal static UniqueKey Parse(string input)
         {
@@ -165,14 +167,7 @@ namespace Orleans.Runtime
         internal static UniqueKey NewKey(ulong n0, ulong n1, ulong typeCodeData, string keyExt)
         {
             ValidateKeyExt(keyExt, typeCodeData);
-            return
-                new UniqueKey
-                {
-                    N0 = n0,
-                    N1 = n1,
-                    TypeCodeData = typeCodeData,
-                    KeyExt = keyExt
-                };
+            return new UniqueKey(n0, n1, typeCodeData, keyExt);
         }
 
         private void ThrowIfIsNotLong()
