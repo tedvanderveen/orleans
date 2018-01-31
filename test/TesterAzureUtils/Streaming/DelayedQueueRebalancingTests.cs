@@ -46,8 +46,8 @@ namespace Tester.AzureUtils.Streaming
 
         public DelayedQueueRebalancingTests()
         {
-            this.HostedCluster.KillSilo(this.HostedCluster.SecondarySilos[1]);
-            this.HostedCluster.KillSilo(this.HostedCluster.SecondarySilos[2]);
+            this.HostedCluster.KillSilo(this.HostedCluster.Silos.Skip(1).First());
+            this.HostedCluster.KillSilo(this.HostedCluster.Silos.Skip(2).First());
         }
 
         [SkippableFact, TestCategory("Functional")]

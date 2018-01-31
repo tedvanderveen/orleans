@@ -136,15 +136,15 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             CheckSilosRunning("Before Restart", numExpectedSilos);
-            SiloHandle prim1 = this.HostedCluster.Primary;
-            SiloHandle sec1 = this.HostedCluster.SecondarySilos.First();
+            SiloHandle prim1 = this.HostedCluster.Silos.First();
+            SiloHandle sec1 = this.HostedCluster.Silos.Skip(1).First();
 
             RestartAllSilos();
 
             CheckSilosRunning("After Restart", numExpectedSilos);
 
-            Assert.NotEqual(prim1, this.HostedCluster.Primary); // Should be different Primary silos after restart
-            Assert.NotEqual(sec1, this.HostedCluster.SecondarySilos.First()); // Should be different Secondary silos after restart
+            Assert.NotEqual(prim1, this.HostedCluster.Silos.First()); // Should be different Primary silos after restart
+            Assert.NotEqual(sec1, this.HostedCluster.Silos.Skip(1).First()); // Should be different Secondary silos after restart
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
