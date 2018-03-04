@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.MetadataStore.LiteDB</PackageId>
+    <Title>Microsoft Orleans Metadata Store LiteDB Storage</Title>
+    <Description>High availability, strong consistency metadata store for Microsoft Orleans clusters.</Description>
+    <PackageTags>$(PackageTags)</PackageTags>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyName>Orleans.MetadataStore.LiteDB</AssemblyName>
+    <RootNamespace>Orleans.MetadataStore</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\Orleans.MetadataStore\Orleans.MetadataStore.csproj" />
+    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="LiteDB" Version="4.1.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDependencyInjectionVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
+  </ItemGroup>
+</Project>

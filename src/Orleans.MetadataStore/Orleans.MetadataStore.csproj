@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.MetadataStore</PackageId>
+    <Title>Microsoft Orleans Metadata Store</Title>
+    <Description>High availability, strong consistency metadata store for Microsoft Orleans clusters.</Description>
+    <PackageTags>$(PackageTags)</PackageTags>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyName>Orleans.MetadataStore</AssemblyName>
+    <RootNamespace>Orleans.MetadataStore</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsDependencyInjectionVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
+    <PackageReference Include="Nito.AsyncEx.Coordination" Version="1.0.2" />
+  </ItemGroup>
+</Project>

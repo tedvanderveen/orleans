@@ -44,7 +44,9 @@ namespace Orleans.Runtime
         public static readonly GrainId TestHooksSystemTargetId = GrainId.GetSystemTargetGrainId(26);
         public static readonly GrainId ProtocolGatewayId = GrainId.GetSystemTargetGrainId(27);
         public static readonly GrainId TransactionAgentSystemTargetId = GrainId.GetSystemTargetGrainId(28);
-
+        public static readonly GrainId ConfigurationStoreSystemTargetId = GrainId.GetSystemTargetGrainId(29);
+        
+        public const int KeyValueStoreSystemTargetTypeCode = 253;
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
 

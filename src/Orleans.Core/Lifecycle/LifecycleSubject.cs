@@ -54,7 +54,7 @@ namespace Orleans
             {
                 string error = $"Lifecycle start canceled due to errors at stage {this.highStage}";
                 this.logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
-                throw new OrleansLifecycleCanceledException(error, ex);
+                throw; //new OrleansLifecycleCanceledException(error, ex);
             }
         }
 
