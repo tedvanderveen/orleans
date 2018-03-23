@@ -41,7 +41,8 @@ namespace ServiceBus.Tests
                             {
                                 options.EventHubPartitionCount = TotalQueueCount;
                             }))
-                         .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n));
+                         .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n))
+                         .ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
                 }
             }
         }

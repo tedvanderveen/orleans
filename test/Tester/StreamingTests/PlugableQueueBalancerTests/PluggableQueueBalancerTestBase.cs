@@ -8,19 +8,26 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using System.Linq;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 
 namespace Tester.StreamingTests
 {
     public class PluggableQueueBalancerTestBase : OrleansTestingBase
     {
         private readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-        private static Type QueueBalancerType = typeof(LeaseBasedQueueBalancerForTest);
 
         public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)
         {
             var leaseManager = fixture.GrainFactory.GetGrain<ILeaseManagerGrain>(streamProviderName);
             var expectedResponsibilityPerBalancer = totalQueueCount / siloCount;
             await TestingUtils.WaitUntilAsync(lastTry => CheckLeases(leaseManager, siloCount, expectedResponsibilityPerBalancer, lastTry), Timeout);
+
+
+
+            await Task.Delay(5000);
+
+
+
         }
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -28,6 +35,7 @@ namespace Tester.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
+                hostBuilder.ConfigureLogging(log => log.AddDebug().AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryHandoffManager", LogLevel.Trace));
             }
         }
 

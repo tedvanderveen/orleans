@@ -17,7 +17,6 @@ namespace Orleans.Runtime.GrainDirectory
         private const int HANDOFF_CHUNK_SIZE = 500;
         private readonly LocalGrainDirectory localDirectory;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly IInternalGrainFactory grainFactory;
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
         private readonly Dictionary<SiloAddress, Task> lastPromise;
@@ -27,14 +26,12 @@ namespace Orleans.Runtime.GrainDirectory
         internal GrainDirectoryHandoffManager(
             LocalGrainDirectory localDirectory,
             ISiloStatusOracle siloStatusOracle,
-            IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> createPartion,
             ILoggerFactory loggerFactory)
         {
             logger = loggerFactory.CreateLogger<GrainDirectoryHandoffManager>();
             this.localDirectory = localDirectory;
             this.siloStatusOracle = siloStatusOracle;
-            this.grainFactory = grainFactory;
             this.createPartion = createPartion;
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
             silosHoldingMyPartition = new List<SiloAddress>();
@@ -205,7 +202,11 @@ namespace Orleans.Runtime.GrainDirectory
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
                 // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
                 List<SiloAddress> successors = localDirectory.FindSuccessors(localDirectory.MyAddress, 1);
-                if (!successors.Contains(addedSilo)) return;
+                if (!successors.Contains(addedSilo))
+                {
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"{addedSilo} is not one of my successors.");
+                    return;
+                }
 
                 // check if this is an immediate successor
                 if (successors[0].Equals(addedSilo))

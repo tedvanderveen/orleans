@@ -146,7 +146,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             stopPreparationResolver = new TaskCompletionSource<bool>();
             DirectoryPartition = grainDirectoryPartitionFactory();
-            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
+            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainDirectoryPartitionFactory, loggerFactory);
 
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId, loggerFactory);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorId, loggerFactory);

@@ -5,7 +5,9 @@ using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace Tester.StreamingTests
 {
@@ -27,21 +29,44 @@ namespace Tester.StreamingTests
     {
         //queueId is the lease id here
         private static readonly DateTime UnAssignedLeaseTime = DateTime.MinValue;
+        private readonly int expectedSiloCount;
         private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap;
-        private ISiloStatusOracle siloStatusOracle;
-        private ClusterConfiguration clusterConfiguration;
+
+        public LeaseManagerGrain(IConfiguration configuration)
+        {
+            this.expectedSiloCount = int.Parse(configuration["InitialSilosCount"]);
+        }
+
         public override Task OnActivateAsync()
         {
-            this.siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
-            this.clusterConfiguration = base.ServiceProvider.GetRequiredService<ClusterConfiguration>();
+            this.logger = this.GetLogger(this.GetGrainIdentity() +
+                                         " / " +
+                                         this.GetPrimaryKeyString() +
+                                         " on " +
+                                         this.ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress);
+            this.logger.Info("Activating");
             this.queueLeaseToRenewTimeMap = new Dictionary<QueueId, DateTime>();
             this.responsibilityMap = new Dictionary<string, int>();
+            this.RegisterTimer(_ =>
+                {
+                    this.logger.Info("Still alive");
+                    return Task.CompletedTask;
+                },
+                null,
+                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromMilliseconds(500));
             return Task.CompletedTask;
         }
+
+        public override Task OnDeactivateAsync()
+        {
+            this.logger.Info("Deactivating");
+            return Task.CompletedTask;
+        }
+
         public Task<int> GetLeaseResposibility()
         {
-            var siloCount = this.clusterConfiguration.Overrides.Count;
-            var resposibity = this.queueLeaseToRenewTimeMap.Count / siloCount;
+            var resposibity = this.queueLeaseToRenewTimeMap.Count / this.expectedSiloCount;
             return Task.FromResult(resposibity);
         }
 
@@ -91,14 +116,18 @@ namespace Tester.StreamingTests
 
         //methods used in test asserts
         private Dictionary<string, int> responsibilityMap;
+        private Logger logger;
+
         public Task RecordBalancerResponsibility(string balancerId, int ownedQueues)
         {
             responsibilityMap[balancerId] = ownedQueues;
+            this.logger.Info($"RecordBalancerResponsibility({balancerId}, {ownedQueues}) => \n{string.Join("\n", this.responsibilityMap.Select(kvp => $"{kvp.Key} = {kvp.Value}"))}");
             return Task.CompletedTask;
         }
 
         public Task<Dictionary<string, int>> GetResponsibilityMap()
         {
+            this.logger.Info("GetResponsibilityMap");
             return Task.FromResult(responsibilityMap);
         }
     }
