@@ -23,6 +23,7 @@ namespace ServiceBus.Tests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
+                builder.Options.ConfigureFileLogging = true;
                 builder.Options.InitialSilosCount = SiloCount;
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();

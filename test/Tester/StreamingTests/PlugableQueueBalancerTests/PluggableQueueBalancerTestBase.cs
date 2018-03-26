@@ -21,13 +21,6 @@ namespace Tester.StreamingTests
             var leaseManager = fixture.GrainFactory.GetGrain<ILeaseManagerGrain>(streamProviderName);
             var expectedResponsibilityPerBalancer = totalQueueCount / siloCount;
             await TestingUtils.WaitUntilAsync(lastTry => CheckLeases(leaseManager, siloCount, expectedResponsibilityPerBalancer, lastTry), Timeout);
-
-
-
-            await Task.Delay(5000);
-
-
-
         }
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -35,7 +28,7 @@ namespace Tester.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
-                hostBuilder.ConfigureLogging(log => log.AddDebug().AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryHandoffManager", LogLevel.Trace));
+                hostBuilder.ConfigureLogging(log => log.SetMinimumLevel(LogLevel.Trace));
             }
         }
 
