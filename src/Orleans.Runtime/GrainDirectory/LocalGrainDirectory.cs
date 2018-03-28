@@ -1016,30 +1016,6 @@ namespace Orleans.Runtime.GrainDirectory
             return FindPredecessors(primary, 1);
         }
 
-        /// <summary>
-        /// For testing purposes only.
-        /// Returns the directory information held by the local silo for the provided grain ID.
-        /// The result will be null if no information is held.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <param name="isPrimary"></param>
-        /// <returns></returns>
-        public List<ActivationAddress> GetLocalDataForGrain(GrainId grain, out bool isPrimary)
-        {
-            var primary = CalculateTargetSilo(grain);
-            List<ActivationAddress> backupData = HandoffManager.GetHandedOffInfo(grain);
-            if (MyAddress.Equals(primary))
-            {
-                log.Assert(ErrorCode.DirectoryBothPrimaryAndBackupForGrain, backupData == null,
-                    "Silo contains both primary and backup directory data for grain " + grain);
-                isPrimary = true;
-                return GetLocalDirectoryData(grain).Addresses;
-            }
-
-            isPrimary = false;
-            return backupData;
-        }
-
         #endregion
 
         public override string ToString()
@@ -1089,25 +1065,6 @@ namespace Orleans.Runtime.GrainDirectory
                 distance = successor == null ? 0 : CalcRingDistance(MyAddress, successor);
             }
             return distance;
-        }
-
-        private string RingDistanceToSuccessor_2()
-        {
-            const long ringSize = int.MaxValue * 2L;
-            long distance;
-            List<SiloAddress> successorList = FindSuccessors(MyAddress, 1);
-            if (successorList == null || successorList.Count == 0)
-            {
-                distance = 0;
-            }
-            else
-            {
-                SiloAddress successor = successorList.First();
-                distance = successor == null ? 0 : CalcRingDistance(MyAddress, successor);
-            }
-            double averageRingSpace = membershipRingList.Count == 0 ? 0 : (1.0 / (double)membershipRingList.Count);
-            return string.Format("RingDistance={0:X}, %Ring Space {1:0.00000}%, Average %Ring Space {2:0.00000}%", 
-                distance, ((double)distance / (double)ringSize) * 100.0, averageRingSpace * 100.0);
         }
 
         private static long CalcRingDistance(SiloAddress silo1, SiloAddress silo2)

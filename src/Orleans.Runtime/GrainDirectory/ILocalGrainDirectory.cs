@@ -86,16 +86,6 @@ namespace Orleans.Runtime.GrainDirectory
         List<SiloAddress> GetSilosHoldingDirectoryInformationForGrain(GrainId grain);
 
         /// <summary>
-        /// For testing purposes only.
-        /// Returns the directory information held by another silo for the provided grain ID.
-        /// The result will be null if no information is held.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <param name="isPrimary"></param>
-        /// <returns></returns>
-        List<ActivationAddress> GetLocalDataForGrain(GrainId grain, out bool isPrimary);
-
-        /// <summary>
         /// Returns the directory information held in a local directory partition for the provided grain ID.
         /// The result will be null if no information is held.
         /// </summary>
