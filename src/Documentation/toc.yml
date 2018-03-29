@@ -18,6 +18,9 @@
   href: Deployment-and-Operations/toc.yml
 - name: Advanced Features
   href: Advanced-Concepts/toc.yml
+- name: Provider Model
+  href: Providers/toc.yml
+  homepage: Providers/Overview.md
 - name: Migration from Orleans 1.5
   href: Migration/toc.yml
 - name: Implementation Details
