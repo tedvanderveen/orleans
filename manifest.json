@@ -1,6 +1,6 @@
 {
   "homepages": [],
-  "source_base_path": "C:/GitHub/sergeybykov/orleans-2/src",
+  "source_base_path": "c:/GitHub/sergeybykov/orleans-2/src",
   "xrefmap": "xrefmap.yml",
   "files": [
     {
@@ -1915,66 +1915,6 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Documentation/2.0/Codegen.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/2.0/Codegen.html",
-          "hash": "Cz+n5C5kA6lsT4lvRviMjQ=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/2.0/Migration1.5.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/2.0/Migration1.5.html",
-          "hash": "nzatIyZiQWqyeNhbt65b3g=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/2.0/MigrationAzure2.0.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/2.0/MigrationAzure2.0.html",
-          "hash": "Xz1/qZBZ3O3UD4Z41p0YPw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/2.0/New.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/2.0/New.html",
-          "hash": "Me9qF6f87OwW2oTyaqVeQw=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/2.0/Transactions.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/2.0/Transactions.html",
-          "hash": "UJfRtae/MVAllVvbTMWf2A=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "Documentation/Advanced-Concepts/Activation-Garbage-Collection.md",
       "output": {
         ".html": {
@@ -2088,6 +2028,18 @@
         ".html": {
           "relative_path": "Documentation/Advanced-Concepts/Serialization.html",
           "hash": "R5o5JmnIaY2ZrKLhfT6KdQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Advanced-Concepts/Transactions.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Advanced-Concepts/Transactions.html",
+          "hash": "FCsWtwcAotJ+KKIRG/v0BA=="
         }
       },
       "is_incremental": false,
@@ -2560,6 +2512,30 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "Documentation/Getting-Started-With-Orleans/NuGets.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Getting-Started-With-Orleans/NuGets.html",
+          "hash": "ZnKqaoncI7WnUHWowzdWsg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Getting-Started-With-Orleans/Prerequisites.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Getting-Started-With-Orleans/Prerequisites.html",
+          "hash": "cshZVkLf8WRE1ams5R1u4g=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "Documentation/Getting-Started-With-Orleans/Running-the-Application.md",
       "output": {
         ".html": {
@@ -2654,35 +2630,47 @@
     },
     {
       "type": "Conceptual",
-      "source_relative_path": "Documentation/Installation/NuGets.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/Installation/NuGets.html",
-          "hash": "eGKY8ix21yjMkSC8Fq5HxA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
-      "source_relative_path": "Documentation/Installation/Prerequisites.md",
-      "output": {
-        ".html": {
-          "relative_path": "Documentation/Installation/Prerequisites.html",
-          "hash": "UfFit8fhLJGb1vu5N9RUcA=="
-        }
-      },
-      "is_incremental": false,
-      "version": ""
-    },
-    {
-      "type": "Conceptual",
       "source_relative_path": "Documentation/Introduction.md",
       "output": {
         ".html": {
           "relative_path": "Documentation/Introduction.html",
           "hash": "PKq2PsDxr94IgJN81JfFlg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Migration/Codegen.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Migration/Codegen.html",
+          "hash": "RWEhBUGUNGkdUOxOlvj+mw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Migration/Migration1.5.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Migration/Migration1.5.html",
+          "hash": "K2InErB4H9JNa8+BD1AI+w=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Migration/MigrationAzure2.0.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Migration/MigrationAzure2.0.html",
+          "hash": "bn6/lVqkjRkTxI2zjbl7GQ=="
         }
       },
       "is_incremental": false,
@@ -2743,6 +2731,18 @@
         ".html": {
           "relative_path": "Documentation/Multi-Cluster/SiloConfiguration.html",
           "hash": "xFLMce5CwRg0OhlsDihDhQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Orleans-2.0.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Orleans-2.0.html",
+          "hash": "gmANaFrLnotH0nwAoxEVeg=="
         }
       },
       "is_incremental": false,
@@ -2839,6 +2839,90 @@
         ".html": {
           "relative_path": "Documentation/Presentations/index.html",
           "hash": "YMzCPD+p4TajBiCDtuwJOQ=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Providers/Clustering/Clustering-Configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Providers/Clustering/Clustering-Configuration.html",
+          "hash": "I9tYfnAoe6mo+SgpUglcbg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Providers/Clustering/Clustering-Implementation.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Providers/Clustering/Clustering-Implementation.html",
+          "hash": "HHPFiVTJDJLzL/F/fqb96Q=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Providers/Clustering/Clustering-Overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Providers/Clustering/Clustering-Overview.html",
+          "hash": "UBMGUDNnt7lcuAfs/joxgA=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Providers/Overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Providers/Overview.html",
+          "hash": "8N7/xa/lGzap5NZIlOk0gg=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Providers/Reminders/Reminders-Configuration.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Providers/Reminders/Reminders-Configuration.html",
+          "hash": "xy5MxbqDtnaIBXMV3bgzvw=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Providers/Reminders/Reminders-Implementation.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Providers/Reminders/Reminders-Implementation.html",
+          "hash": "2Xr0qR0opiE2oKKKzhOVog=="
+        }
+      },
+      "is_incremental": false,
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
+      "source_relative_path": "Documentation/Providers/Reminders/Reminders-Overview.md",
+      "output": {
+        ".html": {
+          "relative_path": "Documentation/Providers/Reminders/Reminders-Overview.html",
+          "hash": "5ypf0VgvTj1aaKyFHoJ1Qw=="
         }
       },
       "is_incremental": false,
@@ -3141,7 +3225,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/Samples-Overview/index.html",
-          "hash": "hZglfMjHxpT5rqJsfcPXIw=="
+          "hash": "cP/f/T75Yf3JlCYHqBQa4g=="
         }
       },
       "is_incremental": false,
@@ -3220,7 +3304,7 @@
       "output": {
         ".html": {
           "relative_path": "Documentation/toc.html",
-          "hash": "+1QwZj3EM3BzwA1Ah74zew=="
+          "hash": "n8jRziQFPexbBKVZLfh4Mg=="
         }
       },
       "is_incremental": false,
@@ -3628,7 +3712,7 @@
       "output": {
         ".html": {
           "relative_path": "Tutorials/Declarative-Persistence.html",
-          "hash": "8UBM0GOk/jfSwvisqo+QKw=="
+          "hash": "3diDus00QLDhDpY5T0L2FQ=="
         }
       },
       "is_incremental": false,
@@ -3659,12 +3743,12 @@
       "version": ""
     },
     {
-      "type": "Conceptual",
+      "type": "index",
       "source_relative_path": "index.md",
       "output": {
         ".html": {
           "relative_path": "index.html",
-          "hash": "iykjcfcjhz+PQYsSEVx8Tg=="
+          "hash": "ukAxA+x4nmtpgTjWvTDYrA=="
         }
       },
       "is_incremental": false,
@@ -3695,13 +3779,13 @@
           "details": "Processor TocDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
           "incrementalPhase": "build"
         },
-        "ConceptualDocumentProcessor": {
-          "can_incremental": true,
-          "incrementalPhase": "build"
-        },
         "ResourceDocumentProcessor": {
           "can_incremental": false,
           "details": "Processor ResourceDocumentProcessor cannot suppport incremental build because the processor doesn't implement ISupportIncrementalDocumentProcessor interface.",
+          "incrementalPhase": "build"
+        },
+        "ConceptualDocumentProcessor": {
+          "can_incremental": true,
           "incrementalPhase": "build"
         }
       }
