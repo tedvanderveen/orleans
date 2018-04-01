@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -9,13 +11,14 @@ namespace Orleans.MetadataStore
     [Serializable]
     public class ReplicaSetConfiguration : IVersioned
     {
-        public ReplicaSetConfiguration(Ballot stamp, long version, SiloAddress[] nodes, int acceptQuorum, int prepareQuorum)
+        public ReplicaSetConfiguration(Ballot stamp, long version, SiloAddress[] nodes, int acceptQuorum, int prepareQuorum, RangeMap ranges)
         {
             this.Stamp = stamp;
             this.Version = version;
             this.Nodes = nodes;
             this.AcceptQuorum = acceptQuorum;
             this.PrepareQuorum = prepareQuorum;
+            this.Ranges = ranges;
         }
 
         /// <summary>
@@ -42,6 +45,11 @@ namespace Orleans.MetadataStore
         /// The monotonically increasing version number of this configuration.
         /// </summary>
         public long Version { get; }
+
+        /// <summary>
+        /// The partition range map, which divides a keyspace into a set of arbitrarily-sized partitions.
+        /// </summary>
+        public RangeMap Ranges { get; }
 
         /// <inheritdoc />
         public override string ToString()
