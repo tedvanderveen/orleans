@@ -32,6 +32,11 @@ namespace Orleans.Runtime
 
         public bool IsCompleted => this.alreadyFired;
 
+        public bool IsExpired(long currentTimestamp)
+        {
+            return currentTimestamp - this.durationTimestamp > this.shared.ResponseTimeoutStopwatchTicks;
+        }
+
         public TimeSpan GetCallDuration()
         {
             // A positive timestamp value indicates the start time of an ongoing call,
