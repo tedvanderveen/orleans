@@ -28,15 +28,13 @@ namespace Orleans.Runtime
     internal class InsideRuntimeClient : ISiloRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
-        private readonly ILogger callbackDataLogger;
-        private readonly ILogger timerLogger;
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private readonly Func<Message, bool> tryResendMessage;
-        private readonly Action<Message> unregisterCallback;
+        private SharedCallbackData sharedCallbackData;
+        private SafeTimer callbackTimer;
 
         private ILocalGrainDirectory directory;
         private Catalog catalog;
@@ -76,18 +74,14 @@ namespace Orleans.Runtime
             this.transactionAgent = new Lazy<ITransactionAgent>(() => transactionAgent());
             this.Scheduler = scheduler;
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
-            this.tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
-            this.unregisterCallback = msg => this.UnRegisterCallback(msg.Id);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
             this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
             this.messagingOptions = messagingOptions.Value;
-            this.callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
-            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.schedulingOptions = schedulerOptions.Value;
         }
-        
+
         public IServiceProvider ServiceProvider { get; }
 
         /// <inheritdoc />
@@ -121,20 +115,18 @@ namespace Orleans.Runtime
             GrainReference target,
             InvokeMethodRequest request,
             TaskCompletionSource<object> context,
-            Action<Message, TaskCompletionSource<object>> callback,
             string debugContext,
             InvokeMethodOptions options,
             string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
+            SendRequestMessage(target, message, context, debugContext, options, genericArguments);
         }
 
         private void SendRequestMessage(
             GrainReference target,
             Message message,
             TaskCompletionSource<object> context,
-            Action<Message, TaskCompletionSource<object>> callback,
             string debugContext,
             InvokeMethodOptions options,
             string genericArguments = null)
@@ -204,17 +196,8 @@ namespace Orleans.Runtime
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(
-                    callback,
-                    tryResendMessage,
-                    context,
-                    message,
-                    unregisterCallback,
-                    messagingOptions,
-                    this.callbackDataLogger,
-                    this.timerLogger);
+                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
                 callbacks.TryAdd(message.Id, callbackData);
-                callbackData.StartTimer(ResponseTimeout);
             }
 
             if (targetGrainId.IsSystemTarget)
@@ -700,7 +683,7 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        disposable.Dispose();
+                        disposable?.Dispose();
                     }
                     catch (Exception e)
                     {
@@ -715,6 +698,19 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
             this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
+
+            var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
+            this.sharedCallbackData = new SharedCallbackData(
+                msg => this.Dispatcher.TryResendMessage(msg),
+                msg => this.UnRegisterCallback(msg.Id),
+                this.loggerFactory.CreateLogger<CallbackData>(),
+                this.messagingOptions,
+                this.serializationManager);
+            var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
+            var period = TimeSpan.FromTicks(minTicks);
+            this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
+            this.disposables.Add(this.callbackTimer);
+
             typeManager.Start();
             stopWatch.Stop();
             this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
@@ -815,6 +811,16 @@ namespace Orleans.Runtime
         public void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
+        }
+
+        private void OnCallbackExpiryTick(object state)
+        {
+            foreach (var pair in callbacks)
+            {
+                var callback = pair.Value;
+                if (callback.IsCompleted) continue;
+                if (callback.GetCallDuration() > this.ResponseTimeout) callback.OnTimeout(this.ResponseTimeout);
+            }
         }
     }
 }
