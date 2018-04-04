@@ -938,11 +938,12 @@ namespace Orleans
 
         private void OnCallbackExpiryTick(object state)
         {
+            var currentStopwatchTicks = Stopwatch.GetTimestamp();
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.GetCallDuration() > this.responseTimeout) callback.OnTimeout(this.responseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.responseTimeout);
             }
         }
     }

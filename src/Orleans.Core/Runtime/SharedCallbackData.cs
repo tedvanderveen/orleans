@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -13,6 +14,7 @@ namespace Orleans.Runtime
         public readonly Action<Message> Unregister;
         public readonly ILogger Logger;
         public readonly MessagingOptions MessagingOptions;
+        public readonly long ResponseTimeoutStopwatchTicks;
 
         public SharedCallbackData(
             Func<Message, bool> resendFunc,
@@ -26,6 +28,7 @@ namespace Orleans.Runtime
             this.serializationManager = serializationManager;
             this.Logger = logger;
             this.MessagingOptions = messagingOptions;
+            this.ResponseTimeoutStopwatchTicks = (long)(messagingOptions.ResponseTimeout.TotalSeconds * Stopwatch.Frequency);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
