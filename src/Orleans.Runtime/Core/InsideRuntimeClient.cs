@@ -43,7 +43,6 @@ namespace Orleans.Runtime
         private SerializationManager serializationManager;
 
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
-        public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
         private readonly Lazy<ITransactionAgent> transactionAgent;
@@ -68,7 +67,6 @@ namespace Orleans.Runtime
             this.MySilo = siloDetails.SiloAddress;
             this.disposables = new List<IDisposable>();
             this.callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-            this.ResponseTimeout = messagingOptions.Value.ResponseTimeout;
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
             this.transactionAgent = new Lazy<ITransactionAgent>(() => transactionAgent());
@@ -192,7 +190,7 @@ namespace Orleans.Runtime
                 logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
 
             if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
-                message.TimeToLive = ResponseTimeout;
+                message.TimeToLive = this.messagingOptions.ResponseTimeout;
 
             if (!oneWay)
             {
@@ -644,15 +642,11 @@ namespace Orleans.Runtime
             throw new InvalidOperationException();
         }
 
-        public TimeSpan GetResponseTimeout()
-        {
-            return ResponseTimeout;
-        }
+        /// <inheritdoc />
+        public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
 
-        public void SetResponseTimeout(TimeSpan timeout)
-        {
-            ResponseTimeout = timeout;
-        }
+        /// <inheritdoc />
+        public void SetResponseTimeout(TimeSpan timeout) => this.sharedCallbackData.ResponseTimeout = timeout;
 
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
@@ -820,7 +814,7 @@ namespace Orleans.Runtime
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.ResponseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.messagingOptions.ResponseTimeout);
             }
         }
     }

@@ -99,7 +99,7 @@ namespace Orleans.Runtime
                 alreadyFired = true;
                 if (StatisticsCollector.CollectApplicationRequestsStats)
                 {
-                    durationTimestamp = -Stopwatch.GetTimestamp();
+                    durationTimestamp = -(Stopwatch.GetTimestamp() - durationTimestamp);
                 }
                 this.shared.Unregister(Message);
             }
@@ -128,7 +128,7 @@ namespace Orleans.Runtime
                 alreadyFired = true;
                 if (StatisticsCollector.CollectApplicationRequestsStats)
                 {
-                    durationTimestamp = -Stopwatch.GetTimestamp();
+                    durationTimestamp = -(Stopwatch.GetTimestamp() - durationTimestamp);
                 }
 
                 this.shared.Unregister(Message);

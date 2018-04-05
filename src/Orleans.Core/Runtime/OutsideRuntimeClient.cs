@@ -51,11 +51,6 @@ namespace Orleans
         
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
-        /// <summary>
-        /// Response timeout.
-        /// </summary>
-        private TimeSpan responseTimeout;
-        
         private MessageFactory messageFactory;
         private IPAddress localAddress;
         private IGatewayListProvider gatewayListProvider;
@@ -100,7 +95,6 @@ namespace Orleans
             localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
-            this.responseTimeout = clientMessagingOptions.Value.ResponseTimeout;
         }
 
         internal void ConsumeServices(IServiceProvider services)
@@ -629,7 +623,7 @@ namespace Orleans
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
-                message.TimeToLive = responseTimeout;
+                message.TimeToLive = this.clientMessagingOptions.ResponseTimeout;
             }
 
             if (!oneWay)
@@ -786,15 +780,11 @@ namespace Orleans
             Utils.SafeExecute(() => this.Dispose());
         }
 
-        public void SetResponseTimeout(TimeSpan timeout)
-        {
-            responseTimeout = timeout;
-        }
+        /// <inheritdoc />
+        public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
 
-        public TimeSpan GetResponseTimeout()
-        {
-            return responseTimeout;
-        }
+        /// <inheritdoc />
+        public void SetResponseTimeout(TimeSpan timeout) => this.sharedCallbackData.ResponseTimeout = timeout;
 
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
@@ -933,7 +923,7 @@ namespace Orleans
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.responseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.clientMessagingOptions.ResponseTimeout);
             }
         }
     }
