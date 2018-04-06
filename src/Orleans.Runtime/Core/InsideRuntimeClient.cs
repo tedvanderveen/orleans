@@ -112,19 +112,21 @@ namespace Orleans.Runtime
         public void SendRequest(
             GrainReference target,
             InvokeMethodRequest request,
-            TaskCompletionSource<object> context,
+            Action<Response, object> responseCallback,
+            object context,
             string debugContext,
             InvokeMethodOptions options,
             string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            SendRequestMessage(target, message, context, debugContext, options, genericArguments);
+            SendRequestMessage(target, message, responseCallback, context, debugContext, options, genericArguments);
         }
 
         private void SendRequestMessage(
             GrainReference target,
             Message message,
-            TaskCompletionSource<object> context,
+            Action<Response, object> responseCallback,
+            object context,
             string debugContext,
             InvokeMethodOptions options,
             string genericArguments = null)
@@ -194,7 +196,7 @@ namespace Orleans.Runtime
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                var callbackData = new CallbackData(this.sharedCallbackData, responseCallback, context, message);
                 callbacks.TryAdd(message.Id, callbackData);
             }
 

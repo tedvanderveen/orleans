@@ -593,15 +593,28 @@ namespace Orleans
 
         #region Implementation of IRuntimeClient
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability",
+            "CA2000:Dispose objects before losing scope",
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
-        public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        public void SendRequest(GrainReference target,
+            InvokeMethodRequest request,
+            Action<Response, object> responseCallback,
+            object context,
+            string debugContext = null,
+            InvokeMethodOptions options = InvokeMethodOptions.None,
+            string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            SendRequestMessage(target, message, context, debugContext, options, genericArguments);
+            SendRequestMessage(target, message, responseCallback, context, debugContext, options, genericArguments);
         }
 
-        private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        private void SendRequestMessage(GrainReference target,
+            Message message,
+            Action<Response, object> responseCallback,
+            object context,
+            string debugContext = null,
+            InvokeMethodOptions options = InvokeMethodOptions.None,
+            string genericArguments = null)
         {
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -620,6 +633,7 @@ namespace Orleans
                     message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, target.SystemTargetSilo);
                 }
             }
+
             // Client sending messages to another client (observer). Yes, we support that.
             if (target.IsObserverReference)
             {
@@ -630,6 +644,7 @@ namespace Orleans
             {
                 message.DebugContext = debugContext;
             }
+
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
@@ -638,7 +653,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                var callbackData = new CallbackData(this.sharedCallbackData, responseCallback, context, message);
                 callbacks.TryAdd(message.Id, callbackData);
             }
 

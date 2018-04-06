@@ -3,30 +3,21 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class Response
+    internal struct Response
     {
-        public bool ExceptionFlag { get; private set; }
-        public Exception Exception { get; private set; }
-        public object Data { get; private set; }
+        public bool ExceptionFlag => this.Exception != null;
+        public Exception Exception { get; }
+        public object Data { get; }
 
         public Response(object data)
         {
             Exception = data as Exception;
-            if (Exception == null)
-            {
-                Data = data;
-                ExceptionFlag = false;
-            }
-            else
-            {
-                Data = null;
-                ExceptionFlag = true;
-            }
+            Data = Exception == null ? data : null;
         }
 
-        static public Response ExceptionResponse(Exception exc)
+        public static Response ExceptionResponse(Exception exc)
         {
-            return new Response(null) {ExceptionFlag = true, Exception = exc, Data = null};
+            return new Response(exc);
         }
 
         public override string ToString()
@@ -34,7 +25,6 @@ namespace Orleans.Runtime
             return String.Format("Response ExceptionFlag={0}", ExceptionFlag);
         }
 
-        private static readonly Response done = new Response(null);
-        public static Response Done { get { return done; } }
+        public static Response Done { get; } = new Response(null);
     }
 }

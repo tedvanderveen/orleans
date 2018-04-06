@@ -33,7 +33,7 @@ namespace Orleans.Runtime
             IEnumerable<IOutgoingGrainCallFilter> outgoingCallFilters)
         {
             this.grainReferenceMethodCache = new InterfaceToImplementationMappingCache();
-            this.sendRequestDelegate = SendRequest;
+            this.sendRequestDelegate = this.SendRequest<object>;
             this.logger = logger;
             this.RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
@@ -70,7 +70,7 @@ namespace Orleans.Runtime
             if (IsUnordered(reference))
                 options |= InvokeMethodOptions.Unordered;
 
-            Task<object> resultTask = InvokeMethod_Impl(reference, request, null, options);
+            Task<T> resultTask = InvokeMethod_Impl<T>(reference, request, null, options);
 
             if (resultTask == null)
             {
@@ -84,7 +84,7 @@ namespace Orleans.Runtime
             }
 
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
-            return resultTask.ToTypedTask<T>();
+            return resultTask;
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
@@ -92,7 +92,7 @@ namespace Orleans.Runtime
             return this.internalGrainFactory.Cast<TGrainInterface>(grain);
         }
 
-        private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private Task<TResult> InvokeMethod_Impl<TResult>(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
         {
             if (debugContext == null && USE_DEBUG_CONTEXT)
             {
@@ -119,26 +119,26 @@ namespace Orleans.Runtime
 
             if (this.filters?.Length > 0)
             {
-                return InvokeWithFilters(reference, request, debugContext, options);
+                return InvokeWithFilters<TResult>(reference, request, debugContext, options);
             }
             
-            return SendRequest(reference, request, debugContext, options);
+            return SendRequest<TResult>(reference, request, debugContext, options);
         }
 
-        private Task<object> SendRequest(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private Task<TResult> SendRequest<TResult>(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
         {
             bool isOneWayCall = (options & InvokeMethodOptions.OneWay) != 0;
 
-            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            this.RuntimeClient.SendRequest(reference, request, resolver, debugContext, options, reference.GenericArguments);
+            var resolver = isOneWayCall ? null : new TaskCompletionSource<TResult>();
+            this.RuntimeClient.SendRequest(reference, request, ResultTaskSetter<TResult>.ResponseCallback, resolver, debugContext, options, reference.GenericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
-        private async Task<object> InvokeWithFilters(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private async Task<TResult> InvokeWithFilters<TResult>(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
         {
             var invoker = new OutgoingCallInvoker(reference, request, options, debugContext, this.sendRequestDelegate, this.grainReferenceMethodCache, this.filters);
             await invoker.Invoke();
-            return invoker.Result;
+            return (TResult)invoker.Result;
         }
 
         private void CallClientInvokeCallback(GrainReference reference, InvokeMethodRequest request)
@@ -211,6 +211,20 @@ namespace Orleans.Runtime
         private bool IsUnordered(GrainReference reference)
         {
             return this.RuntimeClient.GrainTypeResolver?.IsUnordered(reference.GrainId.TypeCode) == true;
+        }
+
+        private static class ResultTaskSetter<TResult>
+        {
+            // ReSharper disable once StaticMemberInGenericType
+            public static readonly Action<Response, object> ResponseCallback = SetResult;
+
+            private static void SetResult(Response response, object context)
+            {
+                var completion = (TaskCompletionSource<TResult>)context;
+
+                if (response.ExceptionFlag) completion.TrySetException(response.Exception);
+                else completion.TrySetResult((TResult)response.Data);
+            }
         }
     }
 }

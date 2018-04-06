@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions;
 
@@ -9,22 +8,26 @@ namespace Orleans.Runtime
     internal class CallbackData
     {
         private readonly SharedCallbackData shared;
-        private readonly TaskCompletionSource<object> context;
+        private readonly Action<Response, object> responseCallback;
+        private readonly object context;
 
         private long durationTimestamp;
-        private bool alreadyFired;
 
         public CallbackData(
             SharedCallbackData shared,
-            TaskCompletionSource<object> ctx, 
+            Action<Response, object> responseCallback,
+            object context,
             Message msg)
         {
             this.shared = shared;
-            this.context = ctx;
+            this.responseCallback = responseCallback;
+            this.context = context;
             this.Message = msg;
             this.TransactionInfo = TransactionContext.GetTransactionInfo();
             this.durationTimestamp = Stopwatch.GetTimestamp();
         }
+
+        private bool alreadyFired;
 
         public ITransactionInfo TransactionInfo { get; set; }
 
@@ -109,7 +112,7 @@ namespace Orleans.Runtime
             }
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            this.shared.ResponseCallback(response, context);
+            this.shared.ResponseCallback(response, this.responseCallback, this.context);
         }
 
         private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)
@@ -143,7 +146,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            this.shared.ResponseCallback(error, context);
+            this.shared.ResponseCallback(error, this.responseCallback, this.context);
         }
     }
 }
