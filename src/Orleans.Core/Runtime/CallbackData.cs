@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions;
@@ -10,8 +9,7 @@ namespace Orleans.Runtime
     {
         private readonly SharedCallbackData shared;
         private readonly TaskCompletionSource<object> context;
-
-        private long durationTimestamp;
+        private ValueStopwatch stopwatch;
         private bool alreadyFired;
 
         public CallbackData(
@@ -23,7 +21,7 @@ namespace Orleans.Runtime
             this.context = ctx;
             this.Message = msg;
             this.TransactionInfo = TransactionContext.GetTransactionInfo();
-            this.durationTimestamp = Stopwatch.GetTimestamp();
+            this.stopwatch = ValueStopwatch.StartNew();
         }
 
         public ITransactionInfo TransactionInfo { get; set; }
@@ -34,20 +32,7 @@ namespace Orleans.Runtime
 
         public bool IsExpired(long currentTimestamp)
         {
-            return currentTimestamp - this.durationTimestamp > this.shared.ResponseTimeoutStopwatchTicks;
-        }
-
-        public TimeSpan GetCallDuration()
-        {
-            // A positive timestamp value indicates the start time of an ongoing call,
-            // a negative value indicates the negative total duration of a completed call.
-            var timestamp = this.durationTimestamp;
-            if (timestamp > 0)
-            {
-                return TimeSpan.FromSeconds((Stopwatch.GetTimestamp() - timestamp) / (double)Stopwatch.Frequency);
-            }
-
-            return TimeSpan.FromSeconds(-timestamp / (double)Stopwatch.Frequency);
+            return currentTimestamp - this.stopwatch.GetRawTimestamp() > this.shared.ResponseTimeoutStopwatchTicks;
         }
 
         public void OnTimeout(TimeSpan timeout)
@@ -99,13 +84,13 @@ namespace Orleans.Runtime
                 alreadyFired = true;
                 if (StatisticsCollector.CollectApplicationRequestsStats)
                 {
-                    durationTimestamp = -(Stopwatch.GetTimestamp() - durationTimestamp);
+                    this.stopwatch.Stop();
                 }
                 this.shared.Unregister(Message);
             }
             if (StatisticsCollector.CollectApplicationRequestsStats)
             {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(this.GetCallDuration());
+                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(this.stopwatch.GetElapsedTime());
             }
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
@@ -128,7 +113,7 @@ namespace Orleans.Runtime
                 alreadyFired = true;
                 if (StatisticsCollector.CollectApplicationRequestsStats)
                 {
-                    durationTimestamp = -(Stopwatch.GetTimestamp() - durationTimestamp);
+                    this.stopwatch.Stop();
                 }
 
                 this.shared.Unregister(Message);
@@ -136,7 +121,7 @@ namespace Orleans.Runtime
             
             if (StatisticsCollector.CollectApplicationRequestsStats)
             {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(this.GetCallDuration());
+                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(this.stopwatch.GetElapsedTime());
                 if (isOnTimeout)
                 {
                     ApplicationRequestsStatisticsGroup.OnAppRequestsTimedOut();
