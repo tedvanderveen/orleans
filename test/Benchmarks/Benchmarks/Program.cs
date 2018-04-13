@@ -94,7 +94,7 @@ namespace Benchmarks
             },
             ["PingPongForeverSaturate"] = () =>
             {
-                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+                new SequentialPingBenchmark().PingPongForeverSaturate().GetAwaiter().GetResult();
             },
         };
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
@@ -62,9 +63,16 @@ namespace Benchmarks.Ping
 
         public async Task PingPongForeverSaturate()
         {
-            var num = Environment.ProcessorCount * Environment.ProcessorCount * 2;
+            var stopwatch = Stopwatch.StartNew();
+            var printInterval = TimeSpan.FromSeconds(5);
+            var requestsSinceLastPrint = 0;
+
+            var num = Environment.ProcessorCount * 2;
             var grains = Enumerable.Range(0, num).Select(n => this.client.GetGrain<IPingGrain>(n)).ToArray();
             var others = Enumerable.Range(num, num*2).Select(n => this.client.GetGrain<IPingGrain>(n)).ToArray();
+
+            var requestsPerLoop = 100 * num;
+
             var tasks = new List<Task>(num);
             while (true)
             {
@@ -75,6 +83,14 @@ namespace Benchmarks.Ping
                 }
 
                 await Task.WhenAll(tasks);
+                requestsSinceLastPrint += requestsPerLoop;
+                if (stopwatch.Elapsed > printInterval)
+                {
+                    var rps = requestsSinceLastPrint / stopwatch.Elapsed.TotalSeconds;
+                    requestsSinceLastPrint = 0;
+                    Console.WriteLine($"{rps} RPS");
+                    stopwatch.Restart();
+                }
             }
         }
 
