@@ -240,8 +240,7 @@ namespace Orleans.Runtime
 
         private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
         {
-            var watch = new Stopwatch();
-            watch.Start();
+            var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
             logger.Info(ErrorCode.Catalog_BeforeCollection, "Before collection#{0}: memory={1}MB, #activations={2}, collector={3}.",

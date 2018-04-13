@@ -316,7 +316,7 @@ namespace Orleans.Transactions
         private async Task CommitTransactions(List<TransactionInfo> committingTransactions,
             HashSet<long> outstandingCommits)
         {
-            var stopWatch = Stopwatch.StartNew();
+            var stopWatch = ValueStopwatch.StartNew();
             try
             {
                 metrics.BatchCommitTransactionsRequestsCounter++;
@@ -394,7 +394,7 @@ namespace Orleans.Transactions
 
         private async Task StartTransactions(List<TimeSpan> startingTransactions, List<TaskCompletionSource<long>> startCompletions)
         {
-            var stopWatch = Stopwatch.StartNew();
+            var stopWatch = ValueStopwatch.StartNew();
             try
             {
                 metrics.BatchStartTransactionsRequestCounter++;

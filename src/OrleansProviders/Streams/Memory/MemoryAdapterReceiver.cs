@@ -37,7 +37,7 @@ namespace Orleans.Providers
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            var watch = Stopwatch.StartNew();
+            var watch = ValueStopwatch.StartNew();
             List<IBatchContainer> batches;
             Task<List<MemoryMessageData>> task = null;
             try
@@ -76,7 +76,7 @@ namespace Orleans.Providers
 
         public async Task Shutdown(TimeSpan timeout)
         {
-            var watch = Stopwatch.StartNew();
+            var watch = ValueStopwatch.StartNew();
             try
             {
                 if (awaitingTasks.Count != 0)

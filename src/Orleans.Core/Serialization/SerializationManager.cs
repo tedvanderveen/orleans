@@ -644,10 +644,9 @@ namespace Orleans.Serialization
             var context = this.serializationContext.Value;
             context.Reset();
             
-            Stopwatch timer = null;
+            var timer = ValueStopwatch.Zero;
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer = new Stopwatch();
                 timer.Start();
                 context.SerializationManager.Copies.Increment();
             }
@@ -655,10 +654,8 @@ namespace Orleans.Serialization
             object copy = DeepCopyInner(original, context);
             context.Reset();
             
-
-            if (timer!=null)
+            if (timer.IsRunning)
             {
-                timer.Stop();
                 context.SerializationManager.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
             
@@ -857,10 +854,9 @@ namespace Orleans.Serialization
         /// <param name="stream">The output stream to write to.</param>
         public void Serialize(object raw, IBinaryTokenStreamWriter stream)
         {
-            Stopwatch timer = null;
+            var timer = ValueStopwatch.Zero;
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer = new Stopwatch();
                 timer.Start();
                 Serializations.Increment();
             }
@@ -871,9 +867,8 @@ namespace Orleans.Serialization
             SerializeInner(raw, context, null);
             context.Reset();
             
-            if (timer!=null)
+            if (timer.IsRunning)
             {
-                timer.Stop();
                 SerTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
         }
@@ -1232,10 +1227,9 @@ namespace Orleans.Serialization
             var context = this.deserializationContext.Value;
             context.Reset();
             context.StreamReader = stream;
-            Stopwatch timer = null;
+            var timer = ValueStopwatch.Zero;
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer = new Stopwatch();
                 timer.Start();
                 context.SerializationManager.Deserializations.Increment();
             }
@@ -1244,9 +1238,8 @@ namespace Orleans.Serialization
             result = DeserializeInner(t, context);
             context.Reset();
             
-            if (timer!=null)
+            if (timer.IsRunning)
             {
-                timer.Stop();
                 context.SerializationManager.DeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
             return result;
@@ -1560,42 +1553,38 @@ namespace Orleans.Serialization
         internal static void SerializeMessageHeaders(Message.HeadersContainer headers, SerializationContext context)
         {
             var sm = context.SerializationManager;
-            Stopwatch timer = null;
+            var timer = ValueStopwatch.Zero;
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer = new Stopwatch();
                 timer.Start();
             }
 
             var ser = sm.GetSerializer(typeof(Message.HeadersContainer));
             ser(headers, context, typeof(Message.HeadersContainer));
 
-            if (timer != null)
+            if (timer.IsRunning)
             {
-                timer.Stop();
-                sm.HeaderSers.Increment();
                 sm.HeaderSerTime.IncrementBy(timer.ElapsedTicks);
+                sm.HeaderSers.Increment();
             }
         }
 
         internal static Message.HeadersContainer DeserializeMessageHeaders(IDeserializationContext context)
         {
             var sm = context.GetSerializationManager();
-            Stopwatch timer = null;
+            var timer = ValueStopwatch.Zero;
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer = new Stopwatch();
                 timer.Start();
             }
 
              var des = sm.GetDeserializer(typeof(Message.HeadersContainer));
              var headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), context);
 
-            if (timer != null)
+            if (timer.IsRunning)
             {
-                timer.Stop();
-                sm.HeaderDesers.Increment();
                 sm.HeaderDeserTime.IncrementBy(timer.ElapsedTicks);
+                sm.HeaderDesers.Increment();
             }
 
             return headers;
@@ -1658,11 +1647,10 @@ namespace Orleans.Serialization
 
         internal void FallbackSerializer(object raw, ISerializationContext context, Type t)
         {
-            Stopwatch timer = null;
+            var timer = ValueStopwatch.Zero;
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer = new Stopwatch();
-                timer.Start();
+                timer = ValueStopwatch.StartNew();
                 FallbackSerializations.Increment();
             }
 
@@ -1671,24 +1659,23 @@ namespace Orleans.Serialization
 
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer.Stop();
                 FallbackSerTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
         }
 
         private object FallbackDeserializer(IDeserializationContext context, Type expectedType)
         {
-            Stopwatch timer = null;
+            var timer = ValueStopwatch.Zero;
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer = new Stopwatch();
                 timer.Start();
                 FallbackDeserializations.Increment();
             }
+
             var retVal = fallbackSerializer.Deserialize(expectedType, context);
-            if (timer != null)
+
+            if (timer.IsRunning)
             {
-                timer.Stop();
                 FallbackDeserTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
 
@@ -1711,20 +1698,20 @@ namespace Orleans.Serialization
 
         private object FallbackSerializationDeepCopy(object obj, ICopyContext context)
         {
-            Stopwatch timer = null;
+            var timer = ValueStopwatch.Zero;
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer = new Stopwatch();
-                timer.Start();
+                timer = ValueStopwatch.StartNew();
                 FallbackCopies.Increment();
             }
 
             var retVal = fallbackSerializer.DeepCopy(obj, context);
+
             if (StatisticsCollector.CollectSerializationStats)
             {
-                timer.Stop();
                 FallbackCopiesTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
+
             return retVal;
         }
 

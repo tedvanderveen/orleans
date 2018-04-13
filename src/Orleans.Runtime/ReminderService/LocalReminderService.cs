@@ -513,7 +513,7 @@ namespace Orleans.Runtime.ReminderService
         private class LocalReminderData
         {
             private readonly IRemindable remindable;
-            private Stopwatch stopwatch;
+            private ValueStopwatch stopwatch = ValueStopwatch.Zero;
             private readonly DateTime firstTickTime; // time for the first tick of this reminder
             private readonly TimeSpan period;
             private GrainReference GrainRef {  get { return Identity.GrainRef; } }
@@ -586,17 +586,14 @@ namespace Orleans.Runtime.ReminderService
 
                 try
                 {
-                    if (null != stopwatch)
+                    if (stopwatch.IsRunning)
                     {
                         stopwatch.Stop();
                         var tardiness = stopwatch.Elapsed - period;
                         tardinessStat.AddSample(Math.Max(0, tardiness.Ticks));
                     }
                     await remindable.ReceiveReminder(ReminderName, status);
-
-                    if (null == stopwatch)
-                        stopwatch = new Stopwatch();
-
+                    
                     stopwatch.Restart();
 
                     var after = DateTime.UtcNow;

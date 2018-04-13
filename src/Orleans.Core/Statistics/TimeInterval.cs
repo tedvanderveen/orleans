@@ -26,11 +26,11 @@ namespace Orleans.Runtime
 
     internal class TimeIntervalStopWatchBased : ITimeInterval
     {
-        private readonly Stopwatch stopwatch;
+        private ValueStopwatch stopwatch;
 
         public TimeIntervalStopWatchBased()
         {
-            stopwatch = new Stopwatch();
+            stopwatch = ValueStopwatch.Zero;
         }
 
         public void Start()
@@ -48,7 +48,7 @@ namespace Orleans.Runtime
             stopwatch.Restart();
 
         }
-        public TimeSpan Elapsed { get { return stopwatch.Elapsed; } }
+        public TimeSpan Elapsed => stopwatch.Elapsed;
     }
 
     internal class TimeIntervalDateTimeBased : ITimeInterval
