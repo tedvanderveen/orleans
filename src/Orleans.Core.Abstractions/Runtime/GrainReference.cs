@@ -43,6 +43,9 @@ namespace Orleans.Runtime
         [NonSerialized]
         private readonly InvokeMethodOptions invokeMethodOptions;
 
+        [NonSerialized]
+        internal ActivationAddress CachedActivationAddress;
+
         internal bool IsSystemTarget { get { return GrainId.IsSystemTarget; } }
 
         internal bool IsObserverReference { get { return GrainId.IsClient; } }

@@ -618,7 +618,7 @@ namespace Orleans.Runtime
                 message.TargetActivation = null;
                 message.TargetSilo = null;
                 message.ClearTargetAddress();
-                this.SendMessage(message);
+                this.SendMessage(message, null);
             }
         }
 
@@ -640,9 +640,7 @@ namespace Orleans.Runtime
         /// - add ordering info and maintain send order
         /// 
         /// </summary>
-        /// <param name="message"></param>
-        /// <param name="sendingActivation"></param>
-        public Task AsyncSendMessage(Message message, ActivationData sendingActivation = null)
+        public Task AsyncSendMessage(Message message, GrainReference target = null, ActivationData sendingActivation = null)
         {
             Action<Exception> onAddressingFailure = ex =>
             {
@@ -667,6 +665,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
+                if (target != null) target.CachedActivationAddress = message.TargetAddress;
                 TransportMessage(message, sendingActivation);
             };
 
@@ -675,6 +674,7 @@ namespace Orleans.Runtime
                 var messageAddressingTask = AddressMessage(message);
                 if (messageAddressingTask.Status == TaskStatus.RanToCompletion)
                 {
+                    if (target != null) target.CachedActivationAddress = message.TargetAddress;
                     TransportMessage(message, sendingActivation);
                 }
                 else
@@ -699,9 +699,9 @@ namespace Orleans.Runtime
         // this is a compatibility method for portions of the code base that don't use
         // async/await yet, which is almost everything. there's no liability to discarding the
         // Task returned by AsyncSendMessage()
-        internal void SendMessage(Message message, ActivationData sendingActivation = null)
+        internal void SendMessage(Message message, GrainReference target, ActivationData sendingActivation = null)
         {
-            AsyncSendMessage(message, sendingActivation).Ignore();
+            AsyncSendMessage(message, target, sendingActivation).Ignore();
         }
 
         /// <summary>

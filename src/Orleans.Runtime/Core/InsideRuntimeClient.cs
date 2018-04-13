@@ -168,18 +168,28 @@ namespace Orleans.Runtime
 
             // fill in destination
             var targetGrainId = target.GrainId;
-            message.TargetGrain = targetGrainId;
+            var cachedAddress = target.CachedActivationAddress;
             if (targetGrainId.IsSystemTarget)
             {
                 SiloAddress targetSilo = (target.SystemTargetSilo ?? MySilo);
+                message.TargetGrain = targetGrainId;
                 message.TargetSilo = targetSilo;
                 message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, targetSilo);
                 message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ?
                     Message.Categories.Ping : Message.Categories.System;
             }
-            if (target.IsObserverReference)
+            else if (target.IsObserverReference)
             {
+                message.TargetGrain = targetGrainId;
                 message.TargetObserverId = target.ObserverId;
+            }
+            else if (cachedAddress != null)
+            {
+                message.TargetAddress = cachedAddress;
+            }
+            else
+            {
+                message.TargetGrain = targetGrainId;
             }
 
             if (debugContext != null)
@@ -205,7 +215,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                this.Dispatcher.SendMessage(message, sendingActivation);
+                this.Dispatcher.SendMessage(message, target, sendingActivation);
             }
         }
 
