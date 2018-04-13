@@ -68,8 +68,7 @@ namespace Benchmarks.Ping
             var requestsSinceLastPrint = 0;
 
             var num = Environment.ProcessorCount * 2;
-            var grains = Enumerable.Range(0, num).Select(n => this.client.GetGrain<IPingGrain>(n)).ToArray();
-            var others = Enumerable.Range(num, num*2).Select(n => this.client.GetGrain<IPingGrain>(n)).ToArray();
+            var grains = Enumerable.Range(0, num).Select(n => this.client.GetGrain<IPingGrain>(n * 2)).ToArray();
 
             var requestsPerLoop = 100 * num;
 
@@ -79,7 +78,7 @@ namespace Benchmarks.Ping
                 tasks.Clear();
                 for (var i = 0; i < num; i++)
                 {
-                    tasks.Add(grains[i].PingPongInterleave(others[i], 100));
+                    tasks.Add(grains[i].PingPongHigher(100));
                 }
 
                 await Task.WhenAll(tasks);

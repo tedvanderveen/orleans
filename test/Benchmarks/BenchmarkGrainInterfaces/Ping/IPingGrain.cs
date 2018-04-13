@@ -10,5 +10,11 @@ namespace BenchmarkGrainInterfaces.Ping
 
         [AlwaysInterleave]
         Task PingPongInterleave(IPingGrain other, int count);
+
+        [AlwaysInterleave]
+        Task PingPongHigher(int count);
+
+        [AlwaysInterleave]
+        Task PingPongLower(int count);
     }
 }
