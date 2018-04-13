@@ -90,7 +90,7 @@ namespace Orleans.Runtime
             }
             if (StatisticsCollector.CollectApplicationRequestsStats)
             {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(this.stopwatch.GetElapsedTime());
+                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(this.stopwatch.Elapsed);
             }
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
@@ -121,7 +121,7 @@ namespace Orleans.Runtime
             
             if (StatisticsCollector.CollectApplicationRequestsStats)
             {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(this.stopwatch.GetElapsedTime());
+                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(this.stopwatch.Elapsed);
                 if (isOnTimeout)
                 {
                     ApplicationRequestsStatisticsGroup.OnAppRequestsTimedOut();

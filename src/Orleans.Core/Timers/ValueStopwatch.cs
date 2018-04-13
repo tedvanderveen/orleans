@@ -10,58 +10,72 @@ namespace Orleans.Runtime
 
         public static ValueStopwatch StartNew() => new ValueStopwatch(Stopwatch.GetTimestamp());
 
+        public static ValueStopwatch Zero => default(ValueStopwatch);
+
         private ValueStopwatch(long timestamp)
         {
             this.value = timestamp;
         }
 
-        public TimeSpan GetElapsedTime()
+        public bool IsRunning => this.value > 0;
+        
+        public TimeSpan Elapsed => TimeSpan.FromTicks(this.ElapsedTicks);
+
+        public long ElapsedTicks
         {
-            // A positive timestamp value indicates the start time of a running stopwatch,
-            // a negative value indicates the negative total duration of a stopped stopwatch.
-            var timestamp = this.value;
-
-            // Timestamp can't be zero in an initialized instance. It would have to be literally the first thing executed when the machine boots to be 0.
-            // So it being 0 is a clear indication of default(ValueStopwatch)
-            if (timestamp == 0) ThrowInvalidInstance();
-
-            long delta;
-            if (timestamp > 0)
+            get
             {
-                // The stopwatch is still running.
-                var start = timestamp;
-                var end = Stopwatch.GetTimestamp();
-                delta = end - start;
-            }
-            else
-            {
-                // The stopwatch has been stopped.
-                delta = -timestamp;
-            }
+                // A positive timestamp value indicates the start time of a running stopwatch,
+                // a negative value indicates the negative total duration of a stopped stopwatch.
+                var timestamp = this.value;
+                
+                long delta;
+                if (this.IsRunning)
+                {
+                    // The stopwatch is still running.
+                    var start = timestamp;
+                    var end = Stopwatch.GetTimestamp();
+                    delta = end - start;
+                }
+                else
+                {
+                    // The stopwatch has been stopped.
+                    delta = -timestamp;
+                }
 
-            return new TimeSpan((long) (delta * TimestampToTicks));
+                return (long) (delta * TimestampToTicks);
+            }
         }
 
         public long GetRawTimestamp() => this.value;
 
+        public void Start()
+        {
+            var timestamp = this.value;
+            
+            // If already started, do nothing.
+            if (this.IsRunning) return;
+
+            // Stopwatch is stopped, therefore value is zero or negative.
+            // Add the negative value to the current timestamp to start the stopwatch again.
+            var newValue = Stopwatch.GetTimestamp() + timestamp;
+            if (newValue == 0) newValue = 1;
+            this.value = newValue;
+        }
+
+        public void Restart() => this.value = Stopwatch.GetTimestamp();
+
         public void Stop()
         {
             var timestamp = this.value;
-            if (timestamp > 0)
-            {
-                var end = Stopwatch.GetTimestamp();
-                var delta = end - timestamp;
 
-                // A value of 0 is considered invalid, so shunt 0 values.
-                if (delta == 0) delta = 1;
+            // If already stopped, do nothing.
+            if (!this.IsRunning) return;
 
-                this.value = -delta;
-            }
-        }
+            var end = Stopwatch.GetTimestamp();
+            var delta = end - timestamp;
 
-        private static void ThrowInvalidInstance()
-        {
-            throw new InvalidOperationException($"An uninitialized, or 'default', {nameof(ValueStopwatch)} cannot be used to get elapsed time.");
+            this.value = -delta;
         }
     }
 }
