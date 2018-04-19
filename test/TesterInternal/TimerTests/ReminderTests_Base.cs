@@ -25,7 +25,7 @@ namespace UnitTests.TimerTests
     public class ReminderTests_Base : OrleansTestingBase, IDisposable
     {
         protected TestCluster HostedCluster { get; private set; }
-        internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(100); // the experiment shouldnt be that long that the sums of leeways exceeds a period
+        internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500); // the experiment shouldnt be that long that the sums of leeways exceeds a period
         internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(5);
 
         internal const string DR = "DEFAULT_REMINDER";
@@ -130,11 +130,11 @@ namespace UnitTests.TimerTests
             // do some time tests as well
             log.Info("Time tests");
             TimeSpan period = await grain.GetReminderPeriod(DR);
-            Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
+            await Task.Delay(period.Multiply(2) + LEEWAY); // giving some leeway
             for (int i = 0; i < count; i++)
             {
                 long curr = await grain.GetCounter(DR + "_" + i);
-                Assert.Equal(2,  curr); // string.Format("Incorrect ticks for {0}_{1}", DR, i));
+                AssertIsInRange(curr, 1, 2, grain, DR, LEEWAY); // string.Format("Incorrect ticks for {0}_{1}", DR, i));
             }
         }
         #endregion
@@ -370,7 +370,7 @@ namespace UnitTests.TimerTests
 
             bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
 
-            Skip.IfNot(tickCountIsInsideRange, $"AssertIsInRange: {sb}  -- WHICH IS OUTSIDE RANGE.");
+            Assert.True(tickCountIsInsideRange, $"AssertIsInRange: {sb}  -- WHICH IS OUTSIDE RANGE.");
         }
 
         protected async Task ExecuteWithRetries(Func<string, TimeSpan?, bool, Task> function, string reminderName, TimeSpan? period = null, bool validate = false)
