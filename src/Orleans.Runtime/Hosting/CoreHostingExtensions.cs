@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
@@ -31,7 +32,7 @@ namespace Orleans.Hosting
                             ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
-                    DefaultSiloServices.AddDefaultServices(context, services);
+                    DefaultSiloServices.AddDefaultServices(builder.GetApplicationPartManager(), services);
 
                     context.Properties.Add("OrleansServicesAdded", true);
                 }

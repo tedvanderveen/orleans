@@ -32,6 +32,7 @@ using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Hosting;
 using Orleans.Metadata;
 using Orleans.Statistics;
 using Microsoft.Extensions.Options;
@@ -43,7 +44,7 @@ namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
     {
-        internal static void AddDefaultServices(HostBuilderContext context, IServiceCollection services)
+        internal static void AddDefaultServices(IApplicationPartManager applicationPartManager, IServiceCollection services)
         {
             services.AddOptions();
 
@@ -234,7 +235,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ITransactionAgent,DisabledTransactionAgent>();
 
             // Application Parts
-            var applicationPartManager = context.GetApplicationPartManager();
             services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) {IsFrameworkAssembly = true});
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) {IsFrameworkAssembly = true});

@@ -9,6 +9,7 @@
     <ProjectReference Include="..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="..\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
   </ItemGroup>
 
   <ItemGroup>
