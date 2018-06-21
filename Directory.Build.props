@@ -54,16 +54,17 @@
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.3.409</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisCSharpVersion>2.0.0</MicrosoftCodeAnalysisCSharpVersion>
+    <MicrosoftCSharpVersion>4.5.0</MicrosoftCSharpVersion>
 
-    <MicrosoftExtensionsConfigurationBinderVersion>2.0.0</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>2.0.0</MicrosoftExtensionsConfigurationJsonVersion>
-    <MicrosoftExtensionsConfigurationVersion>2.0.0</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsDependencyInjectionVersion>2.0.0</MicrosoftExtensionsDependencyInjectionVersion>
+    <MicrosoftExtensionsConfigurationBinderVersion>2.1.1</MicrosoftExtensionsConfigurationBinderVersion>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.1.1</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
+    <MicrosoftExtensionsConfigurationJsonVersion>2.1.1</MicrosoftExtensionsConfigurationJsonVersion>
+    <MicrosoftExtensionsConfigurationVersion>2.1.1</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsDependencyInjectionVersion>2.1.1</MicrosoftExtensionsDependencyInjectionVersion>
     <MicrosoftExtensionsDependencyModelVersion>2.0.0</MicrosoftExtensionsDependencyModelVersion>
-    <MicrosoftExtensionsLoggingVersion>2.0.0</MicrosoftExtensionsLoggingVersion>
-    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
-    <MicrosoftExtensionsOptionsVersion>2.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsLoggingVersion>2.1.1</MicrosoftExtensionsLoggingVersion>
+    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.1.1</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
+    <MicrosoftExtensionsOptionsVersion>2.1.1</MicrosoftExtensionsOptionsVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
     <MicrosoftAzureEventHubsVersion>1.0.3</MicrosoftAzureEventHubsVersion>
@@ -86,7 +87,7 @@
     <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
     <MySqlDataVersion>6.9.9</MySqlDataVersion>
     <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
-    <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
+    <NewtonsoftJsonVersion>11.0.2</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
     <NSubstituteVersion>1.10.0</NSubstituteVersion>
     <ZooKeeperNetExVersion>3.4.9.4</ZooKeeperNetExVersion>

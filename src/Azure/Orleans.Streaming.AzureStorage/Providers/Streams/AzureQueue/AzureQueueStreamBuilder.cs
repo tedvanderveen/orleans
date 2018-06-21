@@ -4,6 +4,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
 
 namespace Orleans.Streaming
