@@ -20,6 +20,7 @@ namespace Orleans.Transactions
         private readonly IGrainActivationContext context;
         private readonly ILoggerFactory loggerFactory;
         private readonly string stateName;
+        private readonly ILogger log;
 
         private IStorage<TransactionalStateRecord<TState>> stateStorage;
         private IStorage<TransactionalStateRecord<TState>> StateStorage => stateStorage ?? (stateStorage = GetStateStorage());
@@ -30,17 +31,26 @@ namespace Orleans.Transactions
             this.grainStorage = grainStorage;
             this.context = context;
             this.loggerFactory = loggerFactory;
+            this.log = loggerFactory.CreateLogger($"TransactionalStateStorageProviderWrapper-{context.GrainIdentity}-{stateName}");
             this.stateName = stateName;
         }
 
         public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
+            if (this.log.IsEnabled(LogLevel.Trace))this.log.LogTrace("Load");
             await this.StateStorage.ReadStateAsync();
+            if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"Loaded. ETag: {this.StateStorage.Etag}, CommittedSequenceId: {this.StateStorage.State.CommittedSequenceId.ToString()}, Committed: {this.StateStorage.State.CommittedState}. Pending: {string.Join(", ", this.StateStorage.State.PendingStates)}");
+
             return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, stateStorage.State.CommittedState, stateStorage.State.CommittedSequenceId, stateStorage.State.Metadata, stateStorage.State.PendingStates);
         }
 
         public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
+            if (this.log.IsEnabled(LogLevel.Trace))
+            {
+                this.log.LogTrace($"Store expectedETag {expectedETag}, metadata {metadata}, commitUpTo {commitUpTo}, abortAfter {abortAfter}");
+            }
+
             if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
             stateStorage.State.Metadata = metadata;

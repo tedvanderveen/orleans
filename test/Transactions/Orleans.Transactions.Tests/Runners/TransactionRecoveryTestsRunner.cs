@@ -235,7 +235,7 @@ namespace Orleans.Transactions.Tests
                                  + $"  {first}\n"
                                  + $"^ {result}\n"
                                  + $"= {difference}\n"
-                                 + $"Activation: {grain}");
+                                 + $"Grain: {grain}");
                     }
 
                     j++;
@@ -256,7 +256,7 @@ namespace Orleans.Transactions.Tests
                             + $"  {unambuguousExpected}\n"
                             + $"^ {unambiguousResult}\n"
                             + $"= {difference}\n"
-                            + $"Activation: {grain}");
+                            + $"Grain: {grain}");
                     }
 
                     j++;

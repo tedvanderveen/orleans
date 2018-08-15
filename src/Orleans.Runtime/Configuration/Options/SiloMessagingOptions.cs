@@ -40,7 +40,7 @@ namespace Orleans.Configuration
         /// Interval in which the list of connected clients is refreshed.
         /// </summary>
         public TimeSpan ClientRegistrationRefresh { get; set; } = DEFAULT_CLIENT_REGISTRATION_REFRESH;
-        public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
+        public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(0.1);
 
         /// <summary>
         /// Per grain threshold for pending requests.  Generated warning when exceeded.

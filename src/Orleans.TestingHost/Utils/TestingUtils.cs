@@ -94,12 +94,14 @@ namespace Orleans.TestingHost.Utils
                 };
 
             var task = loop();
+            var timeoutCancellationTokenSource = new CancellationTokenSource();
             try
             {
-                await Task.WhenAny(task, Task.Delay(timeout));
+                await Task.WhenAny(task, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
             }
             finally
             {
+                timeoutCancellationTokenSource.Cancel();
                 keepGoing[0] = false;
             }
 

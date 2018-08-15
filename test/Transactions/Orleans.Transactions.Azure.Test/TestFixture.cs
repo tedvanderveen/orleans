@@ -1,6 +1,9 @@
 using System;
+using Microsoft.Extensions.Configuration;
+using Orleans.Configuration;
 using Xunit;
 using Orleans.Hosting;
+using Orleans.Logging;
 using Orleans.TestingHost;
 using Orleans.Transactions.Tests;
 using Orleans.Transactions.Tests.DeactivationTransaction;
@@ -19,20 +22,30 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddSiloBuilderConfigurator<Configurator>();
+            builder.AddClientBuilderConfigurator<Configurator>();
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class Configurator : ISiloBuilderConfigurator, IClientBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .Configure<SiloMessagingOptions>(o => o.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(30))
                     .ConfigureTracingForTransactionTests()
                     .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .UseDistributedTM();
+                    .UseDistributedTM()
+                    .ConfigureLogging(l => l.AddFile($"C:\\tmp\\tx-tests\\silo_{DateTime.Now.ToString("u").Replace(':', '-').Replace(' ', '_')}-{Guid.NewGuid().GetHashCode():X}.txt"));
+            }
+
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .Configure<ClientMessagingOptions>(o => o.ResponseTimeoutWithDebugger = TimeSpan.FromSeconds(30))
+                    .ConfigureLogging(l => l.AddFile($"C:\\tmp\\tx-tests\\client_{DateTime.Now.ToString("u").Replace(':', '-').Replace(' ', '_')}-{Guid.NewGuid().GetHashCode():X}.txt"));
             }
         }
     }

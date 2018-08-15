@@ -14,26 +14,33 @@ namespace Orleans.Transactions.AzureStorage
     {
         private readonly CloudTable table;
         private readonly string partition;
-        private readonly string stateName;
         private readonly JsonSerializerSettings jsonSettings;
         private readonly ILogger logger;
 
         private KeyEntity key;
         private List<KeyValuePair<long, StateEntity>> states;
 
-        public AzureTableTransactionalStateStorage(CloudTable table, string partition, string stateName, JsonSerializerSettings JsonSettings, ILogger<AzureTableTransactionalStateStorage<TState>> logger)
+        public AzureTableTransactionalStateStorage(CloudTable table, string partition, JsonSerializerSettings jsonSettings, ILoggerFactory loggerFactory)
         {
             this.table = table;
             this.partition = partition;
-            this.stateName = stateName;
-            this.jsonSettings = JsonSettings;
-            this.logger = logger;
+            this.jsonSettings = jsonSettings;
+            this.logger = loggerFactory.CreateLogger($"AzureTableTransactionalStateStorage.{partition}");
+            if (this.logger.IsEnabled(LogLevel.Trace))
+            {
+                this.logger.LogTrace($"Initializing {this.GetType()} for table {table.Name}, partition {partition}");
+            }
         }
 
         public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
             try
             {
+                if (this.logger.IsEnabled(LogLevel.Trace))
+                {
+                    this.logger.LogTrace("Load");
+                }
+
                 var keyTask = ReadKey();
                 var statesTask = ReadStates();
                 key = await keyTask.ConfigureAwait(false);
@@ -42,7 +49,7 @@ namespace Orleans.Transactions.AzureStorage
                 if (string.IsNullOrEmpty(key.ETag))
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.LogDebug($"{partition} Loaded v0, fresh");
+                        logger.LogDebug("Loaded v0, fresh");
 
                     // first time load
                     return new TransactionalStorageLoadResponse<TState>();
@@ -63,25 +70,56 @@ namespace Orleans.Transactions.AzureStorage
                             throw new InvalidOperationException(error);
                         }
                         committedState = states[pos].Value.GetState<TState>(this.jsonSettings);
+                        
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            logger.LogTrace($"Committed state: {committedState}");
+                        }
                     }
 
-                    var PrepareRecordsToRecover = new List<PendingTransactionState<TState>>();
+                    var prepareRecordsToRecover = new List<PendingTransactionState<TState>>();
                     for (int i = 0; i < states.Count; i++)
                     {
                         var kvp = states[i];
 
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            var deserializedState = kvp.Value.GetState<TState>(this.jsonSettings);
+                            logger.LogTrace($"Load: states[{i}]: seq {kvp.Key}, tx: {kvp.Value.TransactionId}, state: {deserializedState} (serialized: {kvp.Value.StateJson})");
+                        }
+
                         // pending states for already committed transactions can be ignored
                         if (kvp.Key <= key.CommittedSequenceId)
+                        {
+                            if (logger.IsEnabled(LogLevel.Trace))
+                            {
+                                logger.LogTrace($"Skipping committed transaction {kvp.Key}");
+                            }
+
                             continue;
+                        }
 
                         // upon recovery, local non-committed transactions are considered aborted
                         if (kvp.Value.TransactionManager == null)
-                            break;
+                        {
+                            if (logger.IsEnabled(LogLevel.Trace))
+                            {
+                                logger.LogTrace($"No transaction manager for transaction {kvp.Key}");
+                            }
 
-                        PrepareRecordsToRecover.Add(new PendingTransactionState<TState>()
+                            break;
+                        }
+                        
+                        var state = kvp.Value.GetState<TState>(this.jsonSettings);
+                        if (logger.IsEnabled(LogLevel.Trace))
+                        {
+                            logger.LogTrace($"Will recover prepared tx {kvp.Key} with state {state}");
+                        }
+
+                        prepareRecordsToRecover.Add(new PendingTransactionState<TState>()
                         {
                             SequenceId = kvp.Key,
-                            State = kvp.Value.GetState<TState>(this.jsonSettings),
+                            State = state,
                             TimeStamp = kvp.Value.TransactionTimestamp,
                             TransactionId = kvp.Value.TransactionId,
                             TransactionManager = kvp.Value.TransactionManager
@@ -95,9 +133,9 @@ namespace Orleans.Transactions.AzureStorage
                     }
 
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.LogDebug($"{partition} Loaded v{this.key.CommittedSequenceId} rows={string.Join(",", states.Select(s => s.Key.ToString("x16")))}");
+                        logger.LogDebug($"Loaded v{this.key.CommittedSequenceId} rows={string.Join(",", states.Select(s => s.Key.ToString("x16")))}");
 
-                    return new TransactionalStorageLoadResponse<TState>(this.key.ETag, committedState, this.key.CommittedSequenceId, this.key.Metadata, PrepareRecordsToRecover);
+                    return new TransactionalStorageLoadResponse<TState>(this.key.ETag, committedState, this.key.CommittedSequenceId, this.key.Metadata, prepareRecordsToRecover);
                 }
             }
             catch (Exception ex)
@@ -110,6 +148,12 @@ namespace Orleans.Transactions.AzureStorage
 
         public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
+            if (this.logger.IsEnabled(LogLevel.Trace))
+            {
+                this.logger.LogTrace(
+                    $"Store ExpectedETag: {expectedETag}, CommitUpTo: {commitUpTo}, AbortAfter: {abortAfter}\n * Metadata: {metadata}\n * StatesToPrepare:\n * {string.Join("\n   * ", statesToPrepare.Select(s => $"seq: {s.SequenceId}, state: {s.State}, tx: {s.TransactionId}"))}");
+            }
+
             if (this.key.ETag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
 
@@ -149,7 +193,7 @@ namespace Orleans.Transactions.AzureStorage
                             await batchOperation.Add(TableOperation.Replace(existing)).ConfigureAwait(false);
 
                             if (logger.IsEnabled(LogLevel.Trace))
-                                logger.LogTrace($"{partition}.{existing.RowKey} Update {existing.TransactionId}");
+                                logger.LogTrace($"{partition}.{existing.RowKey} Update seq {states[pos].Key} tx {existing.TransactionId} state: {s.State}");
                         }
                         else
                         {
@@ -158,7 +202,7 @@ namespace Orleans.Transactions.AzureStorage
                             states.Insert(pos, new KeyValuePair<long, StateEntity>(s.SequenceId, entity));
 
                             if (logger.IsEnabled(LogLevel.Trace))
-                                logger.LogTrace($"{partition}.{entity.RowKey} Insert {entity.TransactionId}");
+                                logger.LogTrace($"{partition}.{entity.RowKey} Insert seq {s.SequenceId} tx {entity.TransactionId} state: {s.State}");
                         }
                     }
 
@@ -173,14 +217,14 @@ namespace Orleans.Transactions.AzureStorage
                 await batchOperation.Add(TableOperation.Insert(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.{KeyEntity.RK} Insert");
+                    logger.LogTrace($"{partition}.{KeyEntity.RK} Insert RK {this.key.CommittedSequenceId} meta: {this.key.Metadata}");
             }
             else
             {
                 await batchOperation.Add(TableOperation.Replace(this.key)).ConfigureAwait(false);
 
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.LogTrace($"{partition}.{KeyEntity.RK} Update");
+                    logger.LogTrace($"{partition}.{KeyEntity.RK} Update RK {this.key.CommittedSequenceId} meta: {this.key.Metadata}");
             }
 
             // fourth, remove obsolete records
@@ -200,7 +244,7 @@ namespace Orleans.Transactions.AzureStorage
             await batchOperation.Flush().ConfigureAwait(false);
 
             if (logger.IsEnabled(LogLevel.Debug))
-                logger.LogDebug($"{partition} Stored v{this.key.CommittedSequenceId} eTag={key.ETag}");
+                logger.LogDebug($"Stored v{this.key.CommittedSequenceId} eTag={key.ETag}");
 
             return key.ETag;
         }

@@ -1264,9 +1264,16 @@ namespace Orleans.Runtime
             // Among those that are registered in the directory, we currently do not have any multi activations.
             if (activation.IsUsingGrainDirectory)
             {
-                var result = await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address, singleActivation:true), this.SchedulingContext);
+                var result = await scheduler.RunOrQueueTask(() =>
+                {
+                    return directory.RegisterAsync(address, singleActivation: true);
+                }, this.SchedulingContext);
                 if (address.Equals(result.Address)) return ActivationRegistrationResult.Success;
-               
+                if (result.Address == null)
+                {
+                    return default(ActivationRegistrationResult);
+                }
+
                 return new ActivationRegistrationResult(existingActivationAddress: result.Address);
             }
             else

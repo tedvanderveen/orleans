@@ -27,13 +27,15 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.Options.InitialSilosCount = 5;
-            builder.AddSiloBuilderConfigurator<TestFixture.SiloBuilderConfigurator>();
+            builder.Options.InitialSilosCount = 3;
+            builder.AddSiloBuilderConfigurator<TestFixture.Configurator>();
+            builder.AddClientBuilderConfigurator<TestFixture.Configurator>();
             builder.AddSiloBuilderConfigurator<TransactionRecoveryTestsRunner.SiloBuilderConfiguratorUsingAzureClustering>();
             builder.AddClientBuilderConfigurator<TransactionRecoveryTestsRunner.ClientBuilderConfiguratorUsingAzureClustering>();
         }
 
-        [SkippableTheory(Skip = "See https://github.com/dotnet/orleans/issues/4617")]
+        [Theory]
+        //[SkippableTheory(Skip = "See https://github.com/dotnet/orleans/issues/4617")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
@@ -42,7 +44,8 @@ namespace Orleans.Transactions.AzureStorage.Tests
             return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName);
         }
 
-        [SkippableTheory(Skip = "See https://github.com/dotnet/orleans/issues/4617")]
+        [Theory]
+        //[SkippableTheory(Skip = "See https://github.com/dotnet/orleans/issues/4617")]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]

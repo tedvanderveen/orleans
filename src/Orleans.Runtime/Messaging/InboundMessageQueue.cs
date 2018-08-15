@@ -95,7 +95,7 @@ namespace Orleans.Runtime.Messaging
             {
                 return this.messageQueues[(int)type].Take();
             }
-            catch (InvalidOperationException)
+            catch (Exception)
             {
                 return null;
             }
@@ -113,6 +113,7 @@ namespace Orleans.Runtime.Messaging
 
                 foreach (var q in this.messageQueues)
                 {
+                    q.CompleteAdding();
                     q.Dispose();
                 }
 

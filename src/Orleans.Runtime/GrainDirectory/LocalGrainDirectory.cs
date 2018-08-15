@@ -601,7 +601,8 @@ namespace Orleans.Runtime.GrainDirectory
                 (singleActivation ? RegistrationsSingleActRemoteSent : RegistrationsRemoteSent).Increment();
 
                 // otherwise, notify the owner
-                AddressAndTag result = await GetDirectoryReference(forwardAddress).RegisterAsync(address, singleActivation, hopCount + 1);
+                var remoteGrainDirectory = GetDirectoryReference(forwardAddress);
+                AddressAndTag result = await remoteGrainDirectory.RegisterAsync(address, singleActivation, hopCount + 1);
 
                 if (singleActivation)
                 {
@@ -962,6 +963,8 @@ namespace Orleans.Runtime.GrainDirectory
             IReadOnlyList<Tuple<SiloAddress, ActivationId>> list;
             var grainId = activationAddress.Grain;
             var activationId = activationAddress.Activation;
+
+            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug($"InvalidateCacheEntry({activationAddress}, {invalidateDirectoryAlso.ToString()})");
 
             // look up grainId activations
             if (DirectoryCache.LookUp(grainId, out list, out version))
