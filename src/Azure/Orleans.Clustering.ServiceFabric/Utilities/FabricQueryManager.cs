@@ -45,10 +45,8 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
             if (partition == null)
             {
                 throw new ArgumentException(
-                    string.Format(
-                        "Only partitions of type {0} are supported. Provided type {1} is not supported.",
-                        nameof(ResolvedServicePartitionWrapper),
-                        servicePartition.GetType()),
+                    $"Only partitions of type {nameof(ResolvedServicePartitionWrapper)} are supported."
+                    + " Provided type {servicePartition.GetType()} is not supported.",
                     nameof(servicePartition));
             }
             
@@ -195,7 +193,7 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
         /// <summary>
         /// Equality comparer for <see cref="ServicePartitionKey"/>.
         /// </summary>
-        private struct ServicePartitionKeyComparer : IEqualityComparer<ServicePartitionKey>
+        private class ServicePartitionKeyComparer : IEqualityComparer<ServicePartitionKey>
         {
             /// <summary>
             /// Gets a singleton instance of this class.
@@ -243,7 +241,6 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
             private static void ThrowKindOutOfRange(ServicePartitionKey x)
             {
                 throw new ArgumentOutOfRangeException(nameof(x), $"Partition kind {x.Kind} is not supported");
-
             }
         }
     }

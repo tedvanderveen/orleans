@@ -1,6 +1,8 @@
 using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
@@ -15,6 +17,7 @@ namespace Orleans.Messaging
     internal class GatewayConnection : OutgoingMessageSender
     {
         private readonly MessageFactory messageFactory;
+        private readonly IEndpointResolver resolver;
         internal bool IsLive { get; private set; }
         internal ClientMessageCenter MsgCenter { get; private set; }
 
@@ -47,6 +50,9 @@ namespace Orleans.Messaging
             receiver = new GatewayClientReceiver(this, mc.SerializationManager, executorService, loggerFactory);
             lastConnect = new DateTime();
             IsLive = true;
+
+// HACK HACK
+            this.resolver = mc.RuntimeClient.ServiceProvider.GetService<IEndpointResolver>();
         }
 
         public override void Start()
@@ -168,9 +174,20 @@ namespace Orleans.Messaging
                             }
                         }
                         lastConnect = DateTime.UtcNow;
-                        Socket = new Socket(Silo.Endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+
+                        IPEndPoint endpoint;
+                        if (this.resolver != null)
+                        {
+                            endpoint = this.resolver.ResolveEndpoint(Silo).GetAwaiter().GetResult();
+                        }
+                        else
+                        {
+                            endpoint = Silo.Endpoint;
+                        }
+
+                        Socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                         Socket.EnableFastpath();
-                        SocketManager.Connect(Socket, Silo.Endpoint, this.openConnectionTimeout);
+                        SocketManager.Connect(Socket, endpoint, this.openConnectionTimeout);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
                         MsgCenter.OnGatewayConnectionOpen();
                         SocketManager.WriteConnectionPreamble(Socket, MsgCenter.ClientId);  // Identifies this client

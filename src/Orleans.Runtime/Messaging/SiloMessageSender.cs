@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
@@ -11,19 +13,22 @@ namespace Orleans.Runtime.Messaging
     internal class SiloMessageSender : OutgoingMessageSender
     {
         private readonly MessageCenter messageCenter;
+        private readonly IEndpointResolver resolver;
         private const int DEFAULT_MAX_RETRIES = 0;
         private readonly Dictionary<SiloAddress, DateTime> lastConnectionFailure;
 
         internal const string RETRY_COUNT_TAG = "RetryCount";
         internal static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
 
-        
+
         internal SiloMessageSender(string nameSuffix, MessageCenter msgCtr, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory)
             : base(nameSuffix, serializationManager, executorService, loggerFactory)
         {
             messageCenter = msgCtr;
             lastConnectionFailure = new Dictionary<SiloAddress, DateTime>();
             OnFault = FaultBehavior.RestartOnFault;
+// HACK HACK, inject properly.
+            this.resolver = serializationManager.ServiceProvider.GetService<IEndpointResolver>();
         }
 
         protected override SocketDirection GetSocketDirection()
@@ -80,20 +85,30 @@ namespace Orleans.Runtime.Messaging
             socket = null;
             targetSilo = msg.TargetSilo;
             error = null;
+            IPEndPoint endpoint = null;
             try
             {
-                socket = messageCenter.SocketManager.GetSendingSocket(targetSilo.Endpoint);
+                if (this.resolver != null)
+                {
+                    endpoint = this.resolver.ResolveEndpoint(targetSilo).GetAwaiter().GetResult();
+                }
+                else
+                {
+                    endpoint = targetSilo.Endpoint;
+                }
+
+                socket = messageCenter.SocketManager.GetSendingSocket(endpoint);
                 if (socket.Connected) return true;
 
-                messageCenter.SocketManager.InvalidateEntry(targetSilo.Endpoint);
-                socket = messageCenter.SocketManager.GetSendingSocket(targetSilo.Endpoint);
+                messageCenter.SocketManager.InvalidateEntry(endpoint);
+                socket = messageCenter.SocketManager.GetSendingSocket(endpoint);
                 return true;
             }
             catch (Exception ex)
             {
-                error = "Exception getting a sending socket to endpoint " + targetSilo.ToString();
+                error = "Exception getting a sending socket to endpoint " + (endpoint?.ToString() ?? "null") + " for silo " + targetSilo;
                 Log.Warn(ErrorCode.Messaging_UnableToGetSendingSocket, error, ex);
-                messageCenter.SocketManager.InvalidateEntry(targetSilo.Endpoint);
+                messageCenter.SocketManager.InvalidateEntry(endpoint);
                 lastConnectionFailure[targetSilo] = DateTime.UtcNow;
                 return false;
             }

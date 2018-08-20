@@ -10,15 +10,63 @@ using Orleans.Clustering.ServiceFabric.Models;
 using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.ServiceFabric;
 
 namespace Orleans.Clustering.ServiceFabric
 {
+    internal class FabricSiloEndpointResolver : IEndpointResolver, IFabricServiceStatusListener
+    {
+        private readonly IFabricServiceSiloResolver resolver;
+        private ServicePartitionSilos[] cache;
+
+        public FabricSiloEndpointResolver(IFabricServiceSiloResolver resolver, IFabricQueryManager queryManager)
+        {
+            this.resolver = resolver;
+            this.resolver.Subscribe(this);
+        }
+
+        public ValueTask<SiloAddress> ResolveEndpoint(SiloAddress address)
+        {
+            var targetId = DodgyLogicalAddressCreator.ConvertToId(address);
+            var result = CacheLookup(targetId);
+            if (result != null) return new ValueTask<SiloAddress>(result);
+
+            return ResolveAsync(targetId);
+
+            SiloAddress CacheLookup(int id)
+            {
+                foreach (var silo in this.cache)
+                {
+                    var thisId = DodgyLogicalAddressCreator.ConvertToId(silo.Partition);
+                    if (thisId == id)
+                    {
+                        var silos = silo.Silos;
+                        if (silos.Count == 0) return null;
+                        return silos[0].SiloAddress;
+                    }
+                }
+
+                return null;
+            }
+
+            async ValueTask<SiloAddress> ResolveAsync(int id)
+            {
+                await this.resolver.Refresh();
+
+                var silo = CacheLookup(id);
+                if (silo == null) throw new KeyNotFoundException($"SiloAddress {address} not found. Cached partitions: {this.cache.Length.ToString()}");
+                return silo;
+            }
+        }
+
+        public void OnUpdate(ServicePartitionSilos[] silos)
+        {
+            this.cache = silos;
+        }
+    }
     /// <summary>
     /// Cluster membership implementation which uses Serivce Fabric's service discovery system.
     /// </summary>
-    internal class FabricMembershipOracle : IMembershipOracle, IFabricServiceStatusListener, IDisposable
+    internal class StatefulFabricMembershipOracle : IMembershipOracle, IFabricServiceStatusListener, IDisposable
     {
         private readonly object updateLock = new object();
         private readonly Dictionary<SiloAddress, SiloEntry> silos = new Dictionary<SiloAddress, SiloEntry>();
@@ -53,10 +101,10 @@ namespace Orleans.Clustering.ServiceFabric
         /// <param name="logger">The logger.</param>
         /// <param name="unknownSiloMonitor">The unknown silo monitor.</param>
         /// <param name="multiClusterOptions">Multi-cluster configuration parameters.</param>
-        public FabricMembershipOracle(
+        public StatefulFabricMembershipOracle(
             ILocalSiloDetails localSiloDetails,
             IFabricServiceSiloResolver fabricServiceSiloResolver,
-            ILogger<FabricMembershipOracle> logger,
+            ILogger<StatefulFabricMembershipOracle> logger,
             UnknownSiloMonitor unknownSiloMonitor,
             IOptions<MultiClusterOptions> multiClusterOptions)
         {
@@ -192,7 +240,7 @@ namespace Orleans.Clustering.ServiceFabric
             this.fabricServiceSiloResolver.Subscribe(this);
             this.RefreshAsync().Ignore();
             this.UpdateStatus(SiloStatus.Joining);
-            
+
             return Task.CompletedTask;
         }
 
@@ -270,7 +318,7 @@ namespace Orleans.Clustering.ServiceFabric
                         if (existing.Status != SiloStatus.Active)
                         {
                             this.log.Error(
-                                (int) ErrorCode.ServiceFabric_MembershipOracle_EncounteredUndeadSilo,
+                                (int)ErrorCode.ServiceFabric_MembershipOracle_EncounteredUndeadSilo,
                                 $"Encountered status update indicating a silo which was previously declared dead is now active. Name: {existing.Name}, Address: {updatedSilo.SiloAddress}");
                         }
                     }
@@ -327,7 +375,7 @@ namespace Orleans.Clustering.ServiceFabric
                     hasChanges = true;
                 }
             }
-            
+
             // If anything was updated, clear the cache before notifying clients.
             if (hasChanges)
             {
@@ -384,7 +432,7 @@ namespace Orleans.Clustering.ServiceFabric
             catch (Exception exception)
             {
                 this.log?.Warn(
-                    (int) ErrorCode.ServiceFabric_MembershipOracle_ExceptionRefreshingPartitions,
+                    (int)ErrorCode.ServiceFabric_MembershipOracle_ExceptionRefreshingPartitions,
                     "Exception refreshing partitions.",
                     exception);
                 throw;

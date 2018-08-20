@@ -158,10 +158,10 @@ namespace Orleans.Clustering.ServiceFabric
         /// </summary>
         private void NotifySubscribers()
         {
-            var copy = this.silos.SelectMany(_ => _.Silos).ToArray();
+            var alias = this.silos;
             foreach (var observer in this.subscribers.Values)
             {
-                observer.OnUpdate(copy);
+                observer.OnUpdate(alias);
             }
         }
     }

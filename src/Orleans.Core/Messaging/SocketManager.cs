@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -11,6 +12,14 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// DANGER! THIS IS FOR PROOF OF CONCEPT CODE!!!!
+    /// </summary>
+public interface IEndpointResolver
+{
+    ValueTask<SiloAddress> ResolveEndpoint(SiloAddress address);
+}
+
     internal class SocketManager
     {
         private readonly LRU<IPEndPoint, Socket> cache;
