@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Clustering.ServiceFabric.Models;
-using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Runtime;
 
 namespace Orleans.Clustering.ServiceFabric
@@ -9,9 +9,9 @@ namespace Orleans.Clustering.ServiceFabric
     internal class FabricSiloEndpointResolver : IEndpointResolver, IFabricServiceStatusListener
     {
         private readonly IFabricServiceSiloResolver resolver;
-        private ServicePartitionSilos[] cache;
+        private ServicePartitionSilos[] cache = Array.Empty<ServicePartitionSilos>();
 
-        public FabricSiloEndpointResolver(IFabricServiceSiloResolver resolver, IFabricQueryManager queryManager)
+        public FabricSiloEndpointResolver(IFabricServiceSiloResolver resolver)
         {
             this.resolver = resolver;
             this.resolver.Subscribe(this);
@@ -53,7 +53,7 @@ namespace Orleans.Clustering.ServiceFabric
 
         public void OnUpdate(ServicePartitionSilos[] silos)
         {
-            this.cache = silos;
+            this.cache = silos ?? throw new ArgumentNullException(nameof(silos));
         }
     }
 }

@@ -6,7 +6,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Clustering.ServiceFabric
 {
-    internal static class DodgyLogicalAddressCreator
+    public static class DodgyLogicalAddressCreator
     {
         public static int ConvertToId(SiloAddress address)
         {
@@ -19,10 +19,22 @@ namespace Orleans.Clustering.ServiceFabric
             return silos.Info.Id.GetHashCode();
         }
 
-        public static SiloAddress ConvertToLogicalAddress(ServicePartitionSilos silos)
+        internal static SiloAddress ConvertToLogicalAddress(ServicePartitionSilos silos)
         {
             var hashCode = (uint)silos.Partition.Info.Id.GetHashCode();
             return SiloAddress.New(new IPEndPoint(hashCode, 65533), silos.Silos[0].SiloAddress.Generation);
+        }
+
+        public static SiloAddress ConvertToLogicalAddress(ServicePartitionInformation partition, int generation)
+        {
+            var hashCode = (uint)partition.Id.GetHashCode();
+            return SiloAddress.New(new IPEndPoint(hashCode, 65533), generation);
+        }
+
+        public static SiloAddress ConvertToLogicalAddress(Guid partitionId, int generation)
+        {
+            var hashCode = (uint)partitionId.GetHashCode();
+            return SiloAddress.New(new IPEndPoint(hashCode, 65533), generation);
         }
     }
 }

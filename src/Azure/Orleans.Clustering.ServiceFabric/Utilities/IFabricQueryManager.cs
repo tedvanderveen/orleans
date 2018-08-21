@@ -79,5 +79,12 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
         }
 
         public bool HasException => this.Exception != null;
+
+        public override string ToString()
+        {
+            if (this.HasException) return $"Exception: {this.Exception}";
+
+            return this.Result?.ToString() ?? "null";
+        }
     }
 }

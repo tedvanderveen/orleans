@@ -75,14 +75,15 @@ namespace Orleans.Clustering.ServiceFabric
                     {
                         updatedRegistrations[partitionInfo.Info.Id] = oldRegistrations[partitionInfo.Info.Id];
                         oldRegistrations.Remove(partitionInfo.Info.Id);
-                        if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Partition change handler for partition {partition.Partition} already registered.");
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace($"Partition change handler for partition {partition.Partition.Info.GetPartitionKeyString()} already registered.");
                         continue;
                     }
+
                     var registrationId = updatedRegistrations[partitionInfo.Info.Id] = this.queryManager.RegisterPartitionChangeHandler(
                         this.serviceName,
                         partitionInfo,
                         this.partitionChangeHandler);
-                    if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Registering partition change handler 0x{registrationId:X} for partition {partition.Partition}");
+                    if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Registering partition change handler 0x{registrationId:X} for partition {partition.Partition.Info.GetPartitionKeyString()}");
                 }
 
                 // Remove old registrations.
@@ -108,6 +109,10 @@ namespace Orleans.Clustering.ServiceFabric
         /// <param name="args">The handler event.</param>
         private void OnPartitionChange(long handlerId, FabricPartitionResolutionChange args)
         {
+            if (this.log.IsEnabled(LogLevel.Debug))
+            {
+                this.log.LogDebug($"Received partition change notification: {args}");
+            }
             if (args.HasException)
             {
                 this.log.Warn(
@@ -136,10 +141,10 @@ namespace Orleans.Clustering.ServiceFabric
 
             if (!found)
             {
-                var knownPartitions = string.Join(", ", this.silos.Select(s => s.Partition));
+                var knownPartitions = string.Join(", ", this.silos.Select(s => s.Partition.Info.GetPartitionKeyString()));
                 this.log.Warn(
                     (int) ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
-                    $"Received update for partition {updated.Partition}, but found no matching partition. Known partitions: {knownPartitions}");
+                    $"Received update for partition {updated.Partition.Info.GetPartitionKeyString()}, but found no matching partition. Known partitions: {knownPartitions}");
             }
             else if (this.log.IsEnabled(LogLevel.Debug))
             {
@@ -149,7 +154,7 @@ namespace Orleans.Clustering.ServiceFabric
                     newSilos.Append($"\n* {silo}");
                 }
 
-                this.log.Debug($"Received update for partition {updated.Partition}. Updated values: {newSilos}");
+                this.log.Debug($"Received update for partition {updated.Partition.Info.GetPartitionKeyString()}. Updated values: {newSilos}");
             }
         }
 

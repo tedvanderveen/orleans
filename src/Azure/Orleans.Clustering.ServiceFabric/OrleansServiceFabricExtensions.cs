@@ -103,11 +103,29 @@ namespace Orleans.Clustering.ServiceFabric
             // Use Service Fabric for cluster membership.
             services.TryAddSingleton<IFabricServiceSiloResolver>(
                     sp => ActivatorUtilities.CreateInstance<FabricServiceSiloResolver>(sp, context.ServiceName));
-            services.TryAddSingleton<IMembershipOracle, FabricMembershipOracle>();
-            services.TryAddSingleton<IGatewayListProvider, FabricGatewayProvider>();
             services.TryAddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
             services.TryAddSingleton<ServiceContext>(context);
-            services.TryAddSingleton<UnknownSiloMonitor>();
+
+            if (context is StatefulServiceContext stateful)
+            {
+                services.TryAddSingleton<StatefulServiceContext>(stateful);
+                services.TryAddSingleton<IMembershipOracle, StatefulFabricMembershipOracle>();
+                services.TryAddSingleton<FabricSiloEndpointResolver>();
+                services.TryAddSingleton<IEndpointResolver>(sp => sp.GetService<FabricSiloEndpointResolver>());
+                services.TryAddSingleton<IFabricServiceStatusListener>(sp => sp.GetService<FabricSiloEndpointResolver>());
+                services.RemoveAll(typeof(ILocalSiloDetails));
+                services.AddSingleton<ILocalSiloDetails, FabricLocalSiloDetails>();
+            }
+            else if (context is StatelessServiceContext stateless)
+            {
+                services.TryAddSingleton<StatelessServiceContext>(stateless);
+                services.TryAddSingleton<IMembershipOracle, FabricMembershipOracle>();
+                services.TryAddSingleton<UnknownSiloMonitor>();
+            }
+            else
+            {
+                throw new NotSupportedException($"Services with context of type {context.GetType()} are not supported.");
+            }
         }
     }
 }

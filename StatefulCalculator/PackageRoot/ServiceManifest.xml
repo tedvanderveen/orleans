@@ -34,6 +34,8 @@
            This endpoint is configured through a ReplicatorSettings config section in the Settings.xml
            file under the ConfigPackage. -->
       <Endpoint Name="ReplicatorEndpoint" />
+      <Endpoint Name="OrleansSiloEndpoint" Protocol="tcp"/>
+      <Endpoint Name="OrleansProxyEndpoint" Protocol="tcp"/>
     </Endpoints>
   </Resources>
 </ServiceManifest>

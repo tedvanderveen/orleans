@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Fabric;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -9,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Clustering.ServiceFabric.Models;
 using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.Clustering.ServiceFabric
@@ -28,7 +31,6 @@ namespace Orleans.Clustering.ServiceFabric
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IFabricServiceSiloResolver fabricServiceSiloResolver;
         private readonly ILogger log;
-        private readonly UnknownSiloMonitor unknownSiloMonitor;
         private readonly MultiClusterOptions multiClusterOptions;
 
         // Cached collection of active silos.
@@ -49,19 +51,16 @@ namespace Orleans.Clustering.ServiceFabric
         /// <param name="localSiloDetails">The silo which this instance will provide membership information for.</param>
         /// <param name="fabricServiceSiloResolver">The service resolver which this instance will use.</param>
         /// <param name="logger">The logger.</param>
-        /// <param name="unknownSiloMonitor">The unknown silo monitor.</param>
         /// <param name="multiClusterOptions">Multi-cluster configuration parameters.</param>
         public StatefulFabricMembershipOracle(
             ILocalSiloDetails localSiloDetails,
             IFabricServiceSiloResolver fabricServiceSiloResolver,
             ILogger<StatefulFabricMembershipOracle> logger,
-            UnknownSiloMonitor unknownSiloMonitor,
             IOptions<MultiClusterOptions> multiClusterOptions)
         {
             this.log = logger;
             this.localSiloDetails = localSiloDetails;
             this.fabricServiceSiloResolver = fabricServiceSiloResolver;
-            this.unknownSiloMonitor = unknownSiloMonitor;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.silos[this.SiloAddress] = new SiloEntry(SiloStatus.Created, this.SiloName);
         }
@@ -115,10 +114,6 @@ namespace Orleans.Clustering.ServiceFabric
         {
             var allSilos = this.GetApproximateSiloStatuses(onlyActive: false);
             var exists = allSilos.TryGetValue(siloAddress, out var status);
-            if (!exists)
-            {
-                this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
-            }
 
             return exists ? status : SiloStatus.None;
         }
@@ -228,10 +223,6 @@ namespace Orleans.Clustering.ServiceFabric
         {
             var result = this.silos.TryGetValue(siloAddress, out var entry);
             siloName = entry?.Name;
-            if (!result)
-            {
-                this.unknownSiloMonitor.ReportUnknownSilo(siloAddress);
-            }
 
             return result;
         }
@@ -261,12 +252,15 @@ namespace Orleans.Clustering.ServiceFabric
                     var updatedSilo = partition.Silos.FirstOrDefault();
                     if (updatedSilo == null)
                     {
-                        this.log.Info($"Partition {partition.Partition} has no active silos.");
+                        this.log.LogWarning($"Partition {partition.Partition} has no active silos.");
+                        continue;
                     }
+
+                    var logicalAddress = DodgyLogicalAddressCreator.ConvertToLogicalAddress(partition);
                     
                     // Update the silo if it was not previously seen or if the existing entry's status
                     // does not match the updated status.
-                    if (this.silos.TryGetValue(updatedSilo.SiloAddress, out var existing))
+                    if (this.silos.TryGetValue(logicalAddress, out var existing))
                     {
                         // Mark the existing silo as being refreshed.
                         existing.Refreshed = true;
@@ -275,20 +269,24 @@ namespace Orleans.Clustering.ServiceFabric
                         {
                             this.log.Error(
                                 (int)ErrorCode.ServiceFabric_MembershipOracle_EncounteredUndeadSilo,
-                                $"Encountered status update indicating a silo which was previously declared dead is now active. Name: {existing.Name}, Address: {updatedSilo.SiloAddress}");
+                                $"Encountered status update indicating a silo which was previously declared dead is now active. Name: {existing.Name}, Logical Address: {logicalAddress}, Physical Address: {updatedSilo.SiloAddress}");
+
+                            existing.Status = SiloStatus.Active;
+                            this.notifications.Add(new StatusChangeNotification(logicalAddress, SiloStatus.Active));
+                            hasChanges = true;
                         }
                     }
                     else
                     {
                         // Add the new silo.
-                        this.notifications.Add(new StatusChangeNotification(updatedSilo.SiloAddress, SiloStatus.Active));
-                        this.silos[updatedSilo.SiloAddress] = new SiloEntry(SiloStatus.Active, updatedSilo.Name)
+                        this.notifications.Add(new StatusChangeNotification(logicalAddress, SiloStatus.Active));
+                        this.silos[logicalAddress] = new SiloEntry(SiloStatus.Active, updatedSilo.Name)
                         {
                             Refreshed = true
                         };
                         hasChanges = true;
 
-                        this.log.Info($"Silo {updatedSilo.SiloAddress} ({updatedSilo.Name}) transitioned from {SiloStatus.None} to {SiloStatus.Active}.");
+                        this.log.Info($"Silo {logicalAddress} (phsyical {updatedSilo.SiloAddress}) ({updatedSilo.Name}) transitioned from {SiloStatus.None} to {SiloStatus.Active}.");
                     }
                 }
 
@@ -314,22 +312,6 @@ namespace Orleans.Clustering.ServiceFabric
 
                 // Clear the caches.
                 this.ClearCaches();
-
-                // Determine dead silos which this silo has seen queries for but have never been seen in an update from Service Fabric.
-                foreach (var deadSilo in this.unknownSiloMonitor.DetermineDeadSilos(this.GetApproximateSiloStatuses(true)))
-                {
-                    if (this.silos.TryGetValue(deadSilo, out var entry))
-                    {
-                        entry.Status = SiloStatus.Dead;
-                    }
-                    else
-                    {
-                        this.silos[deadSilo] = new SiloEntry(SiloStatus.Dead, "unknown");
-                    }
-
-                    this.notifications.Add(new StatusChangeNotification(deadSilo, SiloStatus.Dead));
-                    hasChanges = true;
-                }
             }
 
             // If anything was updated, clear the cache before notifying clients.
@@ -465,6 +447,53 @@ namespace Orleans.Clustering.ServiceFabric
             /// Gets or sets a value indicating whether this entry was updated.
             /// </summary>
             public bool Refreshed { get; set; }
+
+            public override string ToString()
+            {
+                return $"{nameof(Name)}: {Name}, {nameof(Status)}: {Status}, {nameof(Refreshed)}: {Refreshed}";
+            }
         }
+    }
+
+    internal class FabricLocalSiloDetails : ILocalSiloDetails
+    {
+        private readonly Lazy<SiloAddress> siloAddressLazy;
+        private readonly Lazy<SiloAddress> gatewayAddressLazy;
+
+        public FabricLocalSiloDetails(
+            StatefulServiceContext context,
+            IOptions<SiloOptions> siloOptions,
+            IOptions<ClusterOptions> clusterOptions,
+            IOptions<EndpointOptions> siloEndpointOptions)
+        {
+            this.Name = siloOptions.Value.SiloName;
+            this.ClusterId = clusterOptions.Value.ClusterId;
+            this.DnsHostName = Dns.GetHostName();
+
+            var endpointOptions = siloEndpointOptions.Value;
+            this.siloAddressLazy = new Lazy<SiloAddress>(() => DodgyLogicalAddressCreator.ConvertToLogicalAddress(context.PartitionId, SiloAddress.AllocateNewGeneration()));
+            this.gatewayAddressLazy = new Lazy<SiloAddress>(() =>
+            {
+                if (endpointOptions.GatewayPort == 0) return null;
+
+                var hashCode = (uint) context.PartitionId.GetHashCode();
+                return SiloAddress.New(new IPEndPoint(hashCode, endpointOptions.GatewayPort), 0);
+            });
+        }
+
+        /// <inheritdoc />
+        public string Name { get; }
+
+        /// <inheritdoc />
+        public string ClusterId { get; }
+
+        /// <inheritdoc />
+        public string DnsHostName { get; }
+
+        /// <inheritdoc />
+        public SiloAddress SiloAddress => this.siloAddressLazy.Value;
+
+        /// <inheritdoc />
+        public SiloAddress GatewayAddress => this.gatewayAddressLazy.Value;
     }
 }

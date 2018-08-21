@@ -17,13 +17,15 @@ namespace Orleans.Hosting.ServiceFabric
     public class OrleansCommunicationListener : ICommunicationListener
     {
         private readonly Action<ISiloHostBuilder> configure;
+        private readonly Action<ISiloHost> onOpenedActions;
         
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansCommunicationListener" /> class.
         /// </summary>
-        public OrleansCommunicationListener(Action<ISiloHostBuilder> configure)
+        public OrleansCommunicationListener(Action<ISiloHostBuilder> configure, Action<ISiloHost> onOpenedActions = null)
         {
             this.configure = configure ?? throw new ArgumentNullException(nameof(configure));
+            this.onOpenedActions = onOpenedActions ?? (_ => { });
         }
 
         /// <summary>
@@ -41,15 +43,16 @@ namespace Orleans.Hosting.ServiceFabric
                 builder.ConfigureServices(
                     services =>
                     {
-                        services.AddOptions<FabricSiloInfo>().Configure<ILocalSiloDetails>((info, details) =>
-                        {
-                            info.Name = details.Name;
-                            info.Silo = details.SiloAddress.ToParsableString();
-                            if (details.GatewayAddress != null)
+                        services.AddOptions<FabricSiloInfo>()
+                            .Configure<IOptions<EndpointOptions>, ILocalSiloDetails>((info, options, details) =>
                             {
-                                info.Gateway = details.GatewayAddress.ToParsableString();
-                            }
-                        });
+                                info.Name = details.Name;
+                                info.Silo = SiloAddress.New(options.Value.GetPublicSiloEndpoint(), details.SiloAddress.Generation).ToParsableString();
+                                if (details.GatewayAddress != null)
+                                {
+                                    info.Gateway = SiloAddress.New(options.Value.GetPublicProxyEndpoint(), 0).ToParsableString();
+                                }
+                            });
                     });
                 this.configure(builder);
 
@@ -63,7 +66,9 @@ namespace Orleans.Hosting.ServiceFabric
             }
             
             var endpoint = this.Host.Services.GetRequiredService<IOptions<FabricSiloInfo>>().Value;
-            return JsonConvert.SerializeObject(endpoint);
+            var result = JsonConvert.SerializeObject(endpoint);
+            this.onOpenedActions(this.Host);
+            return result;
         }
 
         /// <inheritdoc />

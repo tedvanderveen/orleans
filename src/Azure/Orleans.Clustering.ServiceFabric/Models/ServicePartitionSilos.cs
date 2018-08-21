@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Fabric;
+using System.Linq;
 using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.ServiceFabric;
 
@@ -25,5 +26,10 @@ namespace Orleans.Clustering.ServiceFabric.Models
         /// Gets the partition metadata.
         /// </summary>
         public ResolvedServicePartition Partition { get; }
+
+        public override string ToString()
+        {
+            return $"{nameof(Partition)}: {this.Partition}, {nameof(Silos)}: {string.Join(", ", this.Silos.Select(s => $"{{{s}}}"))}";
+        }
     }
 }
