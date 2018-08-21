@@ -90,7 +90,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.resolver != null)
                 {
-                    endpoint = this.resolver.ResolveEndpoint(targetSilo).GetAwaiter().GetResult();
+                    endpoint = this.resolver.ResolveEndpoint(targetSilo).GetAwaiter().GetResult().Endpoint;
                 }
                 else
                 {

@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Fabric;
+using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.ServiceFabric;
 
 namespace Orleans.Clustering.ServiceFabric.Models
@@ -8,10 +10,10 @@ namespace Orleans.Clustering.ServiceFabric.Models
     /// </summary>
     internal class ServicePartitionSilos
     {
-        public ServicePartitionSilos(IResolvedServicePartition partition, List<FabricSiloInfo> silos)
+        public ServicePartitionSilos(ResolvedServicePartition partition)
         {
             this.Partition = partition;
-            this.Silos = silos;
+            this.Silos = partition.GetPartitionEndpoints();
         }
 
         /// <summary>
@@ -22,6 +24,6 @@ namespace Orleans.Clustering.ServiceFabric.Models
         /// <summary>
         /// Gets the partition metadata.
         /// </summary>
-        public IResolvedServicePartition Partition { get; }
+        public ResolvedServicePartition Partition { get; }
     }
 }

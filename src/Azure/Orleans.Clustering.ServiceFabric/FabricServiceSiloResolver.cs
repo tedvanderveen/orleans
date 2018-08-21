@@ -71,14 +71,14 @@ namespace Orleans.Clustering.ServiceFabric
                 foreach (var partition in this.silos)
                 {
                     var partitionInfo = partition.Partition;
-                    if (oldRegistrations != null && oldRegistrations.ContainsKey(partitionInfo.Id))
+                    if (oldRegistrations != null && oldRegistrations.ContainsKey(partitionInfo.Info.Id))
                     {
-                        updatedRegistrations[partitionInfo.Id] = oldRegistrations[partitionInfo.Id];
-                        oldRegistrations.Remove(partitionInfo.Id);
+                        updatedRegistrations[partitionInfo.Info.Id] = oldRegistrations[partitionInfo.Info.Id];
+                        oldRegistrations.Remove(partitionInfo.Info.Id);
                         if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug($"Partition change handler for partition {partition.Partition} already registered.");
                         continue;
                     }
-                    var registrationId = updatedRegistrations[partitionInfo.Id] = this.queryManager.RegisterPartitionChangeHandler(
+                    var registrationId = updatedRegistrations[partitionInfo.Info.Id] = this.queryManager.RegisterPartitionChangeHandler(
                         this.serviceName,
                         partitionInfo,
                         this.partitionChangeHandler);

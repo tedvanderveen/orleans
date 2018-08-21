@@ -5,10 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Clustering.ServiceFabric.Models;
 using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.ServiceFabric;
 
 namespace Orleans.Clustering.ServiceFabric
 {
@@ -73,9 +73,12 @@ namespace Orleans.Clustering.ServiceFabric
         }
 
         /// <inheritdoc />
-        public void OnUpdate(FabricSiloInfo[] silos)
+        public void OnUpdate(ServicePartitionSilos[] silos)
         {
-            this.gateways = silos.Select(silo => silo.GatewayAddress.ToGatewayUri()).ToList();
+            this.gateways = silos
+                .Select(silo => silo.Silos.FirstOrDefault())
+                .Where(s => s != null)
+                .Select(s => s.GatewayAddress.ToGatewayUri()).ToList();
             if (this.log.IsEnabled(LogLevel.Debug))
             {
                 this.log.Debug($"Updating {this.subscribers.Count} subscribers with {this.gateways.Count} gateways.");

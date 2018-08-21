@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Fabric;
 using System.Net;
 using Orleans.Clustering.ServiceFabric.Models;
 using Orleans.Runtime;
@@ -13,14 +14,14 @@ namespace Orleans.Clustering.ServiceFabric
             return hashCode;
         }
 
-        public static int ConvertToId(IResolvedServicePartition silos)
+        public static int ConvertToId(ResolvedServicePartition silos)
         {
-            return silos.Id.GetHashCode();
+            return silos.Info.Id.GetHashCode();
         }
 
         public static SiloAddress ConvertToLogicalAddress(ServicePartitionSilos silos)
         {
-            var hashCode = (uint)silos.Partition.Id.GetHashCode();
+            var hashCode = (uint)silos.Partition.Info.Id.GetHashCode();
             return SiloAddress.New(new IPEndPoint(hashCode, 65533), silos.Silos[0].SiloAddress.Generation);
         }
     }

@@ -178,7 +178,7 @@ namespace Orleans.Messaging
                         IPEndPoint endpoint;
                         if (this.resolver != null)
                         {
-                            endpoint = this.resolver.ResolveEndpoint(Silo).GetAwaiter().GetResult();
+                            endpoint = this.resolver.ResolveEndpoint(Silo).GetAwaiter().GetResult().Endpoint;
                         }
                         else
                         {

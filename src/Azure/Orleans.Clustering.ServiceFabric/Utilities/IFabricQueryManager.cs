@@ -1,4 +1,5 @@
 using System;
+using System.Fabric;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.ServiceFabric.Services.Client;
@@ -24,7 +25,7 @@ namespace Orleans.Clustering.ServiceFabric.Utilities
         /// <returns>The identifier for the registered handler.</returns>
         long RegisterPartitionChangeHandler(
             Uri serviceName,
-            IResolvedServicePartition servicePartition,
+            ResolvedServicePartition servicePartition,
             FabricPartitionResolutionChangeHandler handler);
 
         /// <summary>
