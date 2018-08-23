@@ -8,7 +8,7 @@ namespace Orleans
 {
     internal static class OrleansTaskExtentions
     {
-        internal static readonly Task<object> CanceledTask = TaskFromCanceled<object>();
+        internal static readonly Task<object> CanceledTask = Task.FromCanceled<object>(CancellationToken.None);
         internal static readonly Task<object> CompletedTask = Task.FromResult(default(object));
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace Orleans
 
             async Task<object> ConvertAsync(Task asyncTask)
             {
-                await asyncTask;
+                await asyncTask.ConfigureAwait(false);
                 return null;
             }
         }
@@ -66,7 +66,7 @@ namespace Orleans
 
             async Task<object> ConvertAsync(Task<T> asyncTask)
             {
-                return await asyncTask;
+                return await asyncTask.ConfigureAwait(false);
             }
         }
 
@@ -89,7 +89,8 @@ namespace Orleans
                     return TaskFromFaulted<T>(task);
 
                 case TaskStatus.Canceled:
-                    return TaskFromCanceled<T>();
+                    var token = (task.Exception?.InnerException as TaskCanceledException)?.CancellationToken ?? CancellationToken.None;
+                    return Task.FromCanceled<T>(token);
 
                 default:
                     return ConvertAsync(task);
@@ -97,7 +98,7 @@ namespace Orleans
 
             async Task<T> ConvertAsync(Task<object> asyncTask)
             {
-                return (T)await asyncTask;
+                return (T)await asyncTask.ConfigureAwait(false);
             }
         }
 
@@ -124,18 +125,11 @@ namespace Orleans
             return completion.Task;
         }
 
-        private static Task<T> TaskFromCanceled<T>()
-        {
-            var completion = new TaskCompletionSource<T>();
-            completion.SetCanceled();
-            return completion.Task;
-        }
-
         public static async Task LogException(this Task task, ILogger logger, ErrorCode errorCode, string message)
         {
             try
             {
-                await task;
+                await task.ConfigureAwait(false);
             }
             catch (Exception exc)
             {
@@ -148,14 +142,14 @@ namespace Orleans
         // Executes an async function such as Exception is never thrown but rather always returned as a broken task.
         public static async Task SafeExecute(Func<Task> action)
         {
-            await action();
+            await action().ConfigureAwait(false);
         }
 
         public static async Task ExecuteAndIgnoreException(Func<Task> action)
         {
             try
             {
-                await action();
+                await action().ConfigureAwait(false);
             }
             catch (Exception)
             {
@@ -188,7 +182,8 @@ namespace Orleans
             {
                 throw new TimeoutException($"Task<T>.WaitForResultWithThrow has timed out after {timeout}.");
             }
-            return task.Result;
+
+            return task.GetAwaiter().GetResult();
         }
 
         /// <summary>
@@ -203,19 +198,20 @@ namespace Orleans
         {
             if (taskToComplete.IsCompleted)
             {
-                await taskToComplete;
+                await taskToComplete.ConfigureAwait(false);
                 return;
             }
 
             var timeoutCancellationTokenSource = new CancellationTokenSource();
-            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
+            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token)).ConfigureAwait(false);
 
             // We got done before the timeout, or were able to complete before this code ran, return the result
             if (taskToComplete == completedTask)
             {
                 timeoutCancellationTokenSource.Cancel();
+
                 // Await this so as to propagate the exception correctly
-                await taskToComplete;
+                await taskToComplete.ConfigureAwait(false);
                 return;
             }
 
@@ -238,18 +234,19 @@ namespace Orleans
         {
             if (taskToComplete.IsCompleted)
             {
-                return await taskToComplete;
+                return await taskToComplete.ConfigureAwait(false);
             }
 
             var timeoutCancellationTokenSource = new CancellationTokenSource();
-            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeSpan, timeoutCancellationTokenSource.Token));
+            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeSpan, timeoutCancellationTokenSource.Token)).ConfigureAwait(false);
 
             // We got done before the timeout, or were able to complete before this code ran, return the result
             if (taskToComplete == completedTask)
             {
                 timeoutCancellationTokenSource.Cancel();
+
                 // Await this so as to propagate the exception correctly
-                return await taskToComplete;
+                return await taskToComplete.ConfigureAwait(false);
             }
 
             // We did not complete before the timeout, we fire and forget to ensure we observe any exceptions that may occur
@@ -272,7 +269,7 @@ namespace Orleans
         {
             try
             {
-                await taskToComplete.WithCancellation(cancellationToken);
+                await taskToComplete.WithCancellation(cancellationToken).ConfigureAwait(false);
             }
             catch (TaskCanceledException ex)
             {
@@ -294,7 +291,7 @@ namespace Orleans
             }
             else if (cancellationToken.IsCancellationRequested)
             {
-                return TaskFromCanceled<object>();
+                return Task.FromCanceled(cancellationToken);
             }
             else
             {
@@ -334,7 +331,7 @@ namespace Orleans
         {
             try
             {
-                return await taskToComplete.WithCancellation(cancellationToken);
+                return await taskToComplete.WithCancellation(cancellationToken).ConfigureAwait(false);
             }
             catch (TaskCanceledException ex)
             {
@@ -357,7 +354,7 @@ namespace Orleans
             }
             else if (cancellationToken.IsCancellationRequested)
             {
-                return TaskFromCanceled<T>();
+                return Task.FromCanceled<T>(cancellationToken);
             }
             else 
             {
@@ -433,6 +430,7 @@ namespace Orleans
                     }
                 });
             }
+
             return resolver.Task;
         }
 
@@ -442,6 +440,7 @@ namespace Orleans
         {
             return task.GetAwaiter().GetResult();
         }
+
         internal static void GetResult(this Task task)
         {
             task.GetAwaiter().GetResult();
