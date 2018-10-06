@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="$(MicrosoftServiceFabricServicesVersion)" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="$(SystemThreadingTasksExtensionsVersion)" />
   </ItemGroup>
 
   <ItemGroup>

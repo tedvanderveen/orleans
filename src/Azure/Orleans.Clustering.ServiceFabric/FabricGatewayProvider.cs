@@ -90,7 +90,7 @@ namespace Orleans.Clustering.ServiceFabric
                 catch (Exception exception)
                 {
                     this.log.Warn(
-                        (int) ErrorCode.ServiceFabric_GatewayProvider_ExceptionNotifyingSubscribers,
+                        (int)Utilities.ErrorCode.ServiceFabric_GatewayProvider_ExceptionNotifyingSubscribers,
                         "Exception while notifying subscriber.",
                         exception);
                 }
@@ -123,7 +123,7 @@ namespace Orleans.Clustering.ServiceFabric
             catch (Exception exception)
             {
                 this.log.Warn(
-                    (int) ErrorCode.ServiceFabric_GatewayProvider_ExceptionRefreshingGateways,
+                    (int)Utilities.ErrorCode.ServiceFabric_GatewayProvider_ExceptionRefreshingGateways,
                     "Exception while refreshing gateways on scheduled interval",
                     exception);
                 throw;

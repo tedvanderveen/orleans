@@ -269,7 +269,7 @@ namespace Orleans.Clustering.ServiceFabric
                         if (existing.Status != SiloStatus.Active)
                         {
                             this.log.Error(
-                                (int) ErrorCode.ServiceFabric_MembershipOracle_EncounteredUndeadSilo,
+                                (int)Utilities.ErrorCode.ServiceFabric_MembershipOracle_EncounteredUndeadSilo,
                                 $"Encountered status update indicating a silo which was previously declared dead is now active. Name: {existing.Name}, Address: {updatedSilo.SiloAddress}");
                         }
                     }
@@ -363,7 +363,7 @@ namespace Orleans.Clustering.ServiceFabric
                         catch (Exception exception)
                         {
                             this.log.Warn(
-                                (int)ErrorCode.ServiceFabric_MembershipOracle_ExceptionNotifyingSubscribers,
+                                (int)Utilities.ErrorCode.ServiceFabric_MembershipOracle_ExceptionNotifyingSubscribers,
                                 "Exception notifying subscriber.",
                                 exception);
                         }
@@ -383,7 +383,7 @@ namespace Orleans.Clustering.ServiceFabric
             catch (Exception exception)
             {
                 this.log?.Warn(
-                    (int) ErrorCode.ServiceFabric_MembershipOracle_ExceptionRefreshingPartitions,
+                    (int) Utilities.ErrorCode.ServiceFabric_MembershipOracle_ExceptionRefreshingPartitions,
                     "Exception refreshing partitions.",
                     exception);
                 throw;

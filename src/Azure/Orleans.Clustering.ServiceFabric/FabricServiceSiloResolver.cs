@@ -111,7 +111,7 @@ namespace Orleans.Clustering.ServiceFabric
             if (args.HasException)
             {
                 this.log.Warn(
-                    (int) ErrorCode.ServiceFabric_Resolver_PartitionResolutionException,
+                    (int) Utilities.ErrorCode.ServiceFabric_Resolver_PartitionResolutionException,
                     "Exception resolving partition change.",
                     args.Exception);
                 return;
@@ -138,7 +138,7 @@ namespace Orleans.Clustering.ServiceFabric
             {
                 var knownPartitions = string.Join(", ", this.silos.Select(s => s.Partition));
                 this.log.Warn(
-                    (int) ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
+                    (int)Utilities.ErrorCode.ServiceFabric_Resolver_PartitionNotFound,
                     $"Received update for partition {updated.Partition}, but found no matching partition. Known partitions: {knownPartitions}");
             }
             else if (this.log.IsEnabled(LogLevel.Debug))
