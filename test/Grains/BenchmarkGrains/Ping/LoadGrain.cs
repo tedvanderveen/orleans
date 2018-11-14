@@ -1,8 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
 using System.Diagnostics;
+using System.Threading;
 using Orleans;
 using BenchmarkGrainInterfaces.Ping;
 
@@ -10,72 +9,149 @@ namespace BenchmarkGrains.Ping
 {
     public class LoadGrain : Grain, ILoadGrain
     {
-        private Task<Report> runTask;
-        private bool end = false;
+        private TaskCompletionSource<Report> runTask;
 
-        public Task Generate(int run, int conncurrent)
+        public Task Generate(int runNumber, int total, int concurrency)
         {
-            this.runTask = RunGeneration(run, conncurrent);
+            long succeeded = 0;
+            long failed = 0;
+            var capturedTotal = total;
+            this.runTask = new TaskCompletionSource<Report>();
+            var pipeline = new AsyncPipeline2(
+                concurrency,
+                () =>
+                {
+                    var num = Interlocked.Decrement(ref capturedTotal);
+                    if (num >= 0)
+                    {
+                        // Do some work.
+                        var grain = this.GrainFactory.GetGrain<IPingGrain>(total * runNumber + num);
+                        return (grain.Run(), true);
+                    }
+
+                    // No more work.
+                    return (null, false);
+                },
+                task =>
+                {
+                    // Tally the results.
+                    switch (task.Status)
+                    {
+                        case TaskStatus.RanToCompletion:
+                            Interlocked.Increment(ref succeeded);
+                            break;
+
+                        case TaskStatus.Canceled:
+                        case TaskStatus.Faulted:
+                            Interlocked.Increment(ref failed);
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(task.Status), task.Status.ToString());
+                    }
+                });
+
+            // Run the pipeline, timing the result.
+            var stopwatch = Stopwatch.StartNew();
+            pipeline.Run().ContinueWith(antecedent =>
+            {
+                if (antecedent.Exception != null)
+                {
+                    this.runTask.TrySetException(antecedent.Exception);
+                    return;
+                }
+
+                stopwatch.Stop();
+
+                this.runTask.TrySetResult(new Report
+                {
+                    Elapsed = stopwatch.Elapsed,
+                    Failed = failed,
+                    Succeeded = succeeded
+                });
+            }).Ignore();
+
             return Task.CompletedTask;
         }
 
         public async Task<Report> TryGetReport()
         {
-            this.end = true;
-            return await this.runTask;
+            var task = this.runTask.Task;
+            if (task.IsCompleted)
+            {
+                return await task;
+            }
+
+            return null;
+        }
+    }
+
+    public class AsyncPipeline2
+    {
+        private readonly int concurrency;
+        private int running;
+        private readonly TaskCompletionSource<int> completed = new TaskCompletionSource<int>();
+        private readonly Func<(Task, bool)> createTask;
+        private readonly Action<Task> onTaskCompleted;
+        private readonly Action<Task> onTaskCompletedHook;
+        private readonly object lockObject = new object();
+
+        public AsyncPipeline2(int concurrency, Func<(Task, bool)> createTask, Action<Task> onTaskCompletedHook)
+        {
+            if (concurrency < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(concurrency), "The pipeline size must be larger than 0.");
+            }
+
+            this.concurrency = concurrency;
+            this.createTask = createTask ?? throw new ArgumentNullException(nameof(createTask));
+            this.onTaskCompletedHook = onTaskCompletedHook;
+            this.onTaskCompleted = this.OnTaskCompletion;
         }
 
-        private async Task<Report> RunGeneration(int run, int conncurrent)
+        internal Task Run()
         {
-            List<Pending> pendingWork = Enumerable.Range(run * conncurrent, conncurrent).Select(i => new Pending() { Grain = GrainFactory.GetGrain<IPingGrain>(i) }).ToList();
-            Report report = new Report();
-            Stopwatch sw = Stopwatch.StartNew();
-            while (!this.end)
-            {
-                foreach(Pending pending in pendingWork.Where(t => t.PendingCall == null))
-                {
-                    pending.PendingCall = pending.Grain.Run();
-                }
-                await ResolvePending(pendingWork, report);
-            }
-            await ResolvePending(pendingWork, report, true);
-            sw.Stop();
-            report.Elapsed = sw.Elapsed;
-            return report;
+            this.ScheduleWork();
+            return this.completed.Task;
         }
 
-        private async Task ResolvePending(List<Pending> pendingWork, Report report, bool all = false)
+        internal void ScheduleWork()
         {
-            try
+            var numCreated = 0;
+            var setCompleted = false;
+            lock (this.lockObject)
             {
-                if(all)
+                while (this.running + numCreated <= this.concurrency)
                 {
-                    await Task.WhenAll(pendingWork.Select(p => p.PendingCall).Where(t => t!=null));
+                    var (task, more) = this.createTask();
+                    if (task != null)
+                    {
+                        ++numCreated;
+                        task.ContinueWith(this.onTaskCompleted).Ignore();
+                    }
+
+                    if (task == null || !more)
+                    {
+                        break;
+                    }
                 }
-                else
+
+                this.running += numCreated;
+                if (this.running == 0 && numCreated == 0)
                 {
-                    await Task.WhenAny(pendingWork.Select(p => p.PendingCall).Where(t => t != null));
-                }
-            } catch (Exception) {}
-            foreach (Pending pending in pendingWork.Where(p => p.PendingCall != null))
-            {
-                if (pending.PendingCall.IsFaulted || pending.PendingCall.IsCanceled)
-                {
-                    report.Failed++;
-                    pending.PendingCall = null;
-                }
-                else if (pending.PendingCall.IsCompleted)
-                {
-                    report.Succeeded++;
-                    pending.PendingCall = null;
+                    setCompleted = true;
                 }
             }
+
+            if (setCompleted) this.completed.TrySetResult(0);
         }
-        
-        private class Pending
+
+        private void OnTaskCompletion(Task task)
         {
-            public IPingGrain Grain { get; set; }
-            public Task PendingCall { get; set; }
+            this.onTaskCompletedHook?.Invoke(task);
+
+            lock (this.lockObject) --this.running;
+
+            this.ScheduleWork();
         }
     }
 }

@@ -13,7 +13,7 @@ namespace BenchmarkGrainInterfaces.Ping
 
     public interface ILoadGrain : IGrainWithGuidKey
     {
-        Task Generate(int run, int conncurrent);
+        Task Generate(int runNumber, int total, int concurrency);
         Task<Report> TryGetReport();
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -109,6 +109,10 @@ namespace Benchmarks
                     },
                     benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                     benchmark => benchmark.Teardown());
+            },
+            ["PingBenchmark"] = () =>
+            {
+                BenchmarkRunner.Run<PingBenchmark>();
             },
             ["SequentialPing"] = () =>
             {
