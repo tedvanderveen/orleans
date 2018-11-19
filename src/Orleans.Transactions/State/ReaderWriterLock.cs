@@ -4,8 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State
@@ -15,8 +18,8 @@ namespace Orleans.Transactions.State
     {
         private readonly TransactionalStateOptions options;
         private readonly TransactionQueue<TState> queue;
-        private BatchWorker lockWorker;
-        private BatchWorker storageWorker;
+        private SimpleBatchWorkerFromDelegate lockWorker;
+        private SimpleBatchWorkerFromDelegate storageWorker;
         private readonly ILogger logger;
 
         // the linked list of lock groups
@@ -32,7 +35,7 @@ namespace Orleans.Transactions.State
         private class LockGroup : Dictionary<Guid, TransactionRecord<TState>>
         {
             public int FillCount;
-            public List<Task> Tasks; // the tasks for executing the waiting operations
+            public List<Action> Tasks; // the tasks for executing the waiting operations
             public LockGroup Next; // queued-up transactions waiting to acquire lock
             public DateTime? Deadline;
             public void Reset()
@@ -44,21 +47,20 @@ namespace Orleans.Transactions.State
             }
         }
 
-        public ReadWriteLock(
-            IOptions<TransactionalStateOptions> options,
+        public ReadWriteLock(IOptions<TransactionalStateOptions> options,
             TransactionQueue<TState> queue,
-            BatchWorker storageWorker,
+            SimpleBatchWorkerFromDelegate storageWorker,
             ILogger logger)
         {
             this.options = options.Value;
             this.queue = queue;
             this.storageWorker = storageWorker;
             this.logger = logger;
-            this.lockWorker = new BatchWorkerFromDelegate(LockWork);
+            this.lockWorker = new SimpleBatchWorkerFromDelegate(LockWork);
         }
 
         public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
-                                   AccessCounter counter, bool isRead, Task<TResult> task)
+                                   AccessCounter counter, bool isRead, Func<TResult> task)
         {
             bool rollbacksOccurred = false;
             List<Task> cleanup = new List<Task>();
@@ -134,22 +136,33 @@ namespace Orleans.Transactions.State
                 }
             }
 
+            var result =
+                new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Action completion = () =>
+            {
+                try
+                {
+                    result.TrySetResult(task());
+                }
+                catch (Exception exception)
+                {
+                    result.TrySetException(exception);
+                }
+            };
+
             if (group != currentGroup)
             {
                 // task will be executed once its group acquires the lock
 
                 if (group.Tasks == null)
-                    group.Tasks = new List<Task>();
+                    group.Tasks = new List<Action>();
 
-                group.Tasks.Add(task);
+                group.Tasks.Add(completion);
             }
             else
             {
                 // execute task right now
-                task.RunSynchronously();
-
-                // look at exception to avoid UnobservedException
-                var ignore = task.Exception;
+                completion();
             }
 
             if (isRead)
@@ -171,7 +184,7 @@ namespace Orleans.Transactions.State
             }
 
             await Task.WhenAll(cleanup);
-            return await task;
+            return await result.Task;
         }
 
         public async Task<Tuple<TransactionalStatus, TransactionRecord<TState>>> ValidateLock(Guid transactionId, AccessCounter accessCount)
@@ -231,9 +244,7 @@ namespace Orleans.Transactions.State
                     foreach (var t in pos.Tasks)
                     {
                         // running the task will abort the transaction because it is not in currentGroup
-                        t.RunSynchronously();
-                        // look at exception to avoid UnobservedException
-                        var ignore = t.Exception;
+                        t();
                     }
                 }
                 pos.Clear();
@@ -360,9 +371,7 @@ namespace Orleans.Transactions.State
                         {
                             foreach (var t in currentGroup.Tasks)
                             {
-                                t.RunSynchronously();
-                                // look at exception to avoid UnobservedException
-                                var ignore = t.Exception;
+                                t();
                             }
                         }
 

@@ -19,7 +19,7 @@ namespace Orleans.Transactions.State
         private readonly ParticipantId resource;
         private readonly Action deactivate;
         private readonly ITransactionalStateStorage<TState> storage;
-        private readonly BatchWorker storageWorker;
+        private readonly SimpleBatchWorkerFromDelegate storageWorker;
         protected readonly ILogger logger;
         private readonly ConfirmationWorker<TState> confirmationWorker;
         private CommitQueue<TState> commitQueue;
@@ -51,7 +51,6 @@ namespace Orleans.Transactions.State
             ParticipantId resource,
             Action deactivate,
             ITransactionalStateStorage<TState> storage,
-            JsonSerializerSettings serializerSettings,
             IClock clock,
             ILogger logger)
         {
@@ -61,7 +60,7 @@ namespace Orleans.Transactions.State
             this.storage = storage;
             this.Clock = new CausalClock(clock);
             this.logger = logger;
-            this.storageWorker = new BatchWorkerFromDelegate(StorageWork);
+            this.storageWorker = new SimpleBatchWorkerFromDelegate(StorageWork);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
@@ -357,7 +356,7 @@ namespace Orleans.Transactions.State
 
             // setting this field makes this entry ready for batching
 
-            remoteEntry.ConfirmationResponsePromise = remoteEntry.ConfirmationResponsePromise ?? new TaskCompletionSource<bool>();
+            remoteEntry.ConfirmationResponsePromise = remoteEntry.ConfirmationResponsePromise ?? new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             storageWorker.Notify();
 

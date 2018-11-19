@@ -22,7 +22,7 @@ namespace Orleans.Transactions.TOC
             JsonSerializerSettings serializerSettings,
             IClock clock,
             ILogger logger)
-            : base(options, resource, deactivate, storage, serializerSettings, clock, logger)
+            : base(options, resource, deactivate, storage, clock, logger)
         {
             this.service = service;
         }

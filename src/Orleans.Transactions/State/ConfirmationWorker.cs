@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Timers;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State
@@ -14,12 +16,12 @@ namespace Orleans.Transactions.State
     {
         private readonly TransactionalStateOptions options;
         private readonly ParticipantId me;
-        private readonly BatchWorker storageWorker;
+        private readonly SimpleBatchWorkerFromDelegate storageWorker;
         private readonly Func<StorageBatch<TState>> getStorageBatch;
         private readonly ILogger logger;
         private readonly HashSet<Guid> pending;
 
-        public ConfirmationWorker(IOptions<TransactionalStateOptions> options, ParticipantId me, BatchWorker storageWorker, Func<StorageBatch<TState>> getStorageBatch, ILogger logger)
+        public ConfirmationWorker(IOptions<TransactionalStateOptions> options, ParticipantId me, SimpleBatchWorkerFromDelegate storageWorker, Func<StorageBatch<TState>> getStorageBatch, ILogger logger)
         {
             this.options = options.Value;
             this.me = me;
@@ -65,7 +67,7 @@ namespace Orleans.Transactions.State
             // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
             while ((await Task.WhenAll(confirmations.Select(c => c.Confirmed()))).Any(b => !b))
             {
-                await Task.Delay(this.options.ConfirmationRetryDelay);
+               await TimerManager.Delay(this.options.ConfirmationRetryDelay);
             }
         }
 
@@ -74,7 +76,7 @@ namespace Orleans.Transactions.State
         {
             while (!await TryCollect(transactionId))
             {
-                await Task.Delay(this.options.ConfirmationRetryDelay);
+                await TimerManager.Delay(this.options.ConfirmationRetryDelay);
             }
         }
 
@@ -83,7 +85,7 @@ namespace Orleans.Transactions.State
         {
             try
             {
-                var storeComplete = new TaskCompletionSource<bool>();
+                var storeComplete = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 // Now we can remove the commit record.
                 StorageBatch<TState> storageBatch = getStorageBatch();
                 storageBatch.Collect(transactionId);
@@ -100,11 +102,7 @@ namespace Orleans.Transactions.State
                 storageWorker.Notify();
 
                 // wait for storage call, so we don't free spin
-                await Task.WhenAll(storeComplete.Task, Task.Delay(this.options.ConfirmationRetryDelay));
-                if (storeComplete.Task.IsCompleted)
-                {
-                    return storeComplete.Task.Result;
-                }
+                return await storeComplete.Task;
             }
             catch(Exception ex)
             {
