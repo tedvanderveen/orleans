@@ -1,8 +1,71 @@
-﻿using System;
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans
 {
+    public abstract class SimpleBatchWorker
+    {
+        private int status;
+
+        private static class Status
+        {
+            public const int Idle = 0;
+            public const int Running = 1;
+            public const int Loop = 2;
+        }
+
+        /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
+        protected abstract Task Work();
+
+        /// <summary>
+        /// Notify the worker that there is more work.
+        /// </summary>
+        public void Notify()
+        {
+            // If already running, loop, otherwise start running.
+            if (Interlocked.CompareExchange(ref this.status, Status.Loop, Status.Running) == Status.Idle)
+            {
+                this.Run().Ignore();
+            }
+        }
+
+        public void Notify(DateTime dueTime) => this.RunAfterDelay(dueTime).Ignore();
+
+        private async Task RunAfterDelay(DateTime dueTime)
+        {
+            var delay = dueTime - DateTime.UtcNow;
+            if (delay > TimeSpan.Zero) await Task.Delay(delay);
+
+            // If already running, loop, otherwise start running.
+            if (Interlocked.CompareExchange(ref this.status, Status.Loop, Status.Running) == Status.Idle)
+            {
+                await this.Run();
+            }
+        }
+        
+        private async Task Run()
+        {
+            // If already running/looping, exit.
+            if (Interlocked.CompareExchange(ref this.status, Status.Running, Status.Idle) != Status.Idle) return;
+
+            do
+            {
+                // If we were told to loop, reset the loop status.
+                Interlocked.CompareExchange(ref this.status, Status.Running, Status.Loop);
+
+                try
+                {
+                    await this.Work();
+                }
+                catch
+                {
+                    // Ignore
+                }
+            } while (Interlocked.CompareExchange(ref this.status, Status.Idle, Status.Running) == Status.Loop);
+        }
+    }
+
     /// <summary>
     /// General pattern for an asynchronous worker that performs a work task, when notified,
     /// to service queued work. Each work cycle handles ALL the queued work. 
@@ -79,14 +142,14 @@ namespace Orleans
             }
         }
 
-        private async Task ScheduleNotify(DateTime time, DateTime now)
+        private Task ScheduleNotify(DateTime time, DateTime now)
         {
-            await Task.Delay(time - now);
-
             if (scheduledNotify == time)
             {
                 Notify();
             }
+
+            return Task.CompletedTask;
         }
 
         private void Start()
@@ -248,5 +311,17 @@ namespace Orleans
         {
             return work();
         }
+    }
+
+    public class SimpleBatchWorkerFromDelegate : SimpleBatchWorker
+    {
+        private readonly Func<Task> work;
+
+        public SimpleBatchWorkerFromDelegate(Func<Task> work)
+        {
+            this.work = work;
+        }
+
+        protected override Task Work() => this.work();
     }
 }
