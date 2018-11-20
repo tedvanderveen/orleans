@@ -220,7 +220,7 @@ namespace Orleans.Transactions
             Action deactivate = () => grainRuntime.DeactivateOnIdle(context.GrainInstance);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
-            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, this.serializerSettings, clock, logger);
+            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, clock, logger);
 
             setupResourceFactory(this.context, this.config.StateName, queue);
 

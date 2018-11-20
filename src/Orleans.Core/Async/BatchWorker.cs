@@ -34,9 +34,6 @@ namespace Orleans
 
         private async Task RunAfterDelay(DateTime dueTime)
         {
-            var delay = dueTime - DateTime.UtcNow;
-            if (delay > TimeSpan.Zero) await Task.Delay(delay);
-
             // If already running, loop, otherwise start running.
             if (Interlocked.CompareExchange(ref this.status, Status.Loop, Status.Running) == Status.Idle)
             {
