@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using HWT;
@@ -10,7 +10,25 @@ namespace Orleans
     {
         private static readonly HashedWheelTimer Manager = new HashedWheelTimer(TimeSpan.FromMilliseconds(250), 1024, 1024 * 1024 * 1024);
 
-        public static TimedAwaiter Delay(TimeSpan delay) => Manager.Delay((long)delay.TotalMilliseconds);
+        public static async Task Delay(TimeSpan delay)
+        {
+            var awaitable = new TimerCallback();
+            Manager.NewTimeout(awaitable, delay);
+            await awaitable;
+        }
+
+        private class TimerCallback : TimerTask
+        {
+            private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public void Run(HWT.Timeout timeout)
+            {
+                timeout.Cancel();
+                this.completion.TrySetResult(true);
+            }
+
+            public TaskAwaiter<bool> GetAwaiter() => this.completion.Task.GetAwaiter();
+        }
     }
 
     public abstract class SimpleBatchWorker
