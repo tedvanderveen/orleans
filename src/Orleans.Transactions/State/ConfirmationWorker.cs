@@ -66,7 +66,7 @@ namespace Orleans.Transactions.State
             // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
             while ((await Task.WhenAll(confirmations.Select(c => c.Confirmed()))).Any(b => !b))
             {
-               // await Task.Delay(this.options.ConfirmationRetryDelay);
+               await TimerManager.Delay(this.options.ConfirmationRetryDelay);
             }
         }
 
@@ -75,7 +75,7 @@ namespace Orleans.Transactions.State
         {
             while (!await TryCollect(transactionId))
             {
-                //await Task.Delay(this.options.ConfirmationRetryDelay);
+                await TimerManager.Delay(this.options.ConfirmationRetryDelay);
             }
         }
 

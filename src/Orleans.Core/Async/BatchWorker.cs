@@ -2,12 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using HWT;
 
 namespace Orleans
 {
+    public static class TimerManager
+    {
+        private static readonly HashedWheelTimer Manager = new HashedWheelTimer(TimeSpan.FromMilliseconds(250), 1024, 1024 * 1024 * 1024);
+
+        public static TimedAwaiter Delay(TimeSpan delay) => Manager.Delay((long)delay.TotalMilliseconds);
+    }
+
     public abstract class SimpleBatchWorker
     {
-        private readonly LinkedList<DateTime> schedule = new LinkedList<DateTime>();
         private int status;
 
         private static class Status
@@ -39,14 +46,7 @@ namespace Orleans
             var delay = dueTime - DateTime.UtcNow;
             if (delay > TimeSpan.Zero)
             {
-                if (delay < TimeSpan.FromSeconds(1)) dueTime = DateTime.UtcNow + TimeSpan.FromSeconds(1);
-
-                lock (this.schedule)
-                {
-                    this.schedule.AddLast(dueTime);
-                }
-
-                await this.Schedule();
+                await TimerManager.Delay(delay);
             }
 
             // If already running, loop, otherwise start running.
@@ -79,39 +79,9 @@ namespace Orleans
                 if (loopIterations > 3)
                 {
                     loopIterations = 0;
-                    await this.Schedule();
+                    await TimerManager.Delay(TimeSpan.FromSeconds(1));
                 }
-
             } while (Interlocked.CompareExchange(ref this.status, Status.Idle, Status.Running) == Status.Loop);
-        }
-
-        private async Task Schedule()
-        {
-            var now = DateTime.UtcNow;
-            var delay = TimeSpan.MaxValue;
-            lock (this.schedule)
-            {
-                var prev = this.schedule.First;
-                var current = this.schedule.First;
-                while (current != null)
-                {
-                    var item = current.Value;
-                    var duration = item - now;
-                    if (duration < delay)
-                    {
-                        delay = duration;
-                    }
-
-                    prev = current;
-                    current = current.Next;
-                }
-
-                this.schedule.Remove(prev);
-            }
-
-            if (delay < TimeSpan.FromSeconds(1)) delay = TimeSpan.FromSeconds(1);
-
-            await Task.Delay(delay);
         }
     }
 
@@ -193,7 +163,7 @@ namespace Orleans
 
         private Task ScheduleNotify(DateTime time, DateTime now)
         {
-            if (scheduledNotify == time)
+            if (scheduledNotify == now)
             {
                 Notify();
             }

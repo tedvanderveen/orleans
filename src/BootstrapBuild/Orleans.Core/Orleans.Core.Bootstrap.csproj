@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AssemblyName>Orleans.Core</AssemblyName>
     <RootNamespace>Orleans</RootNamespace>
@@ -43,6 +43,7 @@
     <PackageReference Include="System.Threading.ThreadPool" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Xml.XmlDocument" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Xml.XPath.XmlDocument" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="HashedWheelTimer" Version="1.0.3" />
   </ItemGroup>
 
   <ItemGroup>
