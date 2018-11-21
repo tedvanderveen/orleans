@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -6,6 +7,7 @@ namespace Orleans
 {
     public abstract class SimpleBatchWorker
     {
+        private readonly LinkedList<DateTime> schedule = new LinkedList<DateTime>();
         private int status;
 
         private static class Status
@@ -34,6 +36,19 @@ namespace Orleans
 
         private async Task RunAfterDelay(DateTime dueTime)
         {
+            var delay = dueTime - DateTime.UtcNow;
+            if (delay > TimeSpan.Zero)
+            {
+                if (delay < TimeSpan.FromSeconds(1)) dueTime = DateTime.UtcNow + TimeSpan.FromSeconds(1);
+
+                lock (this.schedule)
+                {
+                    this.schedule.AddLast(dueTime);
+                }
+
+                await this.Schedule();
+            }
+
             // If already running, loop, otherwise start running.
             if (Interlocked.CompareExchange(ref this.status, Status.Loop, Status.Running) == Status.Idle)
             {
@@ -46,6 +61,7 @@ namespace Orleans
             // If already running/looping, exit.
             if (Interlocked.CompareExchange(ref this.status, Status.Running, Status.Idle) != Status.Idle) return;
 
+            var loopIterations = 0;
             do
             {
                 // If we were told to loop, reset the loop status.
@@ -59,7 +75,43 @@ namespace Orleans
                 {
                     // Ignore
                 }
+
+                if (loopIterations > 3)
+                {
+                    loopIterations = 0;
+                    await this.Schedule();
+                }
+
             } while (Interlocked.CompareExchange(ref this.status, Status.Idle, Status.Running) == Status.Loop);
+        }
+
+        private async Task Schedule()
+        {
+            var now = DateTime.UtcNow;
+            var delay = TimeSpan.MaxValue;
+            lock (this.schedule)
+            {
+                var prev = this.schedule.First;
+                var current = this.schedule.First;
+                while (current != null)
+                {
+                    var item = current.Value;
+                    var duration = item - now;
+                    if (duration < delay)
+                    {
+                        delay = duration;
+                    }
+
+                    prev = current;
+                    current = current.Next;
+                }
+
+                this.schedule.Remove(prev);
+            }
+
+            if (delay < TimeSpan.FromSeconds(1)) delay = TimeSpan.FromSeconds(1);
+
+            await Task.Delay(delay);
         }
     }
 
