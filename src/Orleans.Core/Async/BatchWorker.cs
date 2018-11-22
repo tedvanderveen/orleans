@@ -8,7 +8,7 @@ namespace Orleans
 {
     public static class TimerManager
     {
-        private static readonly HashedWheelTimer Manager = new HashedWheelTimer(TimeSpan.FromMilliseconds(250), 1024, 1024 * 1024 * 1024);
+        private static readonly HashedWheelTimer Manager = new HashedWheelTimer(TimeSpan.FromMilliseconds(25), 1024, 0);
 
         public static async Task Delay(TimeSpan delay)
         {
@@ -21,11 +21,7 @@ namespace Orleans
         {
             private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            public void Run(HWT.Timeout timeout)
-            {
-                timeout.Cancel();
-                this.completion.TrySetResult(true);
-            }
+            public void Run(HWT.Timeout timeout) => this.completion.TrySetResult(true);
 
             public TaskAwaiter<bool> GetAwaiter() => this.completion.Task.GetAwaiter();
         }
