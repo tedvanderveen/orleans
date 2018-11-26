@@ -3,10 +3,11 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using HWT;
+using Orleans.Timers;
 
 namespace Orleans
 {
-    public static class TimerManager
+    /*public static class TimerManager
     {
         private static readonly HashedWheelTimer Manager = new HashedWheelTimer(TimeSpan.FromMilliseconds(25), 1024, 0);
 
@@ -25,7 +26,7 @@ namespace Orleans
 
             public TaskAwaiter<bool> GetAwaiter() => this.completion.Task.GetAwaiter();
         }
-    }
+    }*/
 
     public abstract class SimpleBatchWorker
     {
