@@ -10,7 +10,8 @@ namespace Orleans.Threading
         public bool TryGet()
         {
             var threadId = Thread.CurrentThread.ManagedThreadId;
-            return Interlocked.CompareExchange(ref this.lockState, threadId, Unlocked) == threadId;
+            var previousValue = Interlocked.CompareExchange(ref this.lockState, threadId, Unlocked);
+            return previousValue == threadId || previousValue == Unlocked;
         }
 
         public void Get()

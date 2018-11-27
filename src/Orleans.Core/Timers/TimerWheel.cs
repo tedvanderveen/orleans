@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,21 +12,22 @@ namespace Orleans.Timers
         public static DelayAwaitable Delay(TimeSpan timeout)
         {
             var dueTime = DateTime.UtcNow + timeout;
-            var result = new DelayAwaitable();
-            var holder = new DelayTimerElementHolder(dueTime, result);
-            TimerWheel<DelayAwaitable>.Register(holder);
+            var result = new DelayAwaitable(dueTime);
+            TimerWheel<DelayAwaitable>.Register(result);
             return result;
         }
     }
 
-    // Removes the need in timer per item, optimized for single-threaded consumption. 
-    internal static class TimerWheel<T> where T : IOnTimeout
+    internal static class TimerWheel<T> where T : class, ITimerCallback
     {
+        private static volatile TimerWheelQueueThreadLocals[] allThreadLocalsArray = new TimerWheelQueueThreadLocals[16];
+
         [ThreadStatic]
-        private static TimerWheelQueueThreadLocals<T> queueThreadLocals;
+        private static TimerWheelQueueThreadLocals queueThreadLocals;
 
-        private static readonly SparseArray<TimerWheelQueueThreadLocals<T>> AllThreadLocals = new SparseArray<TimerWheelQueueThreadLocals<T>>(16);
+        private static TimerWheelQueueThreadLocals[] AllThreadLocals => allThreadLocalsArray;
 
+        // ReSharper disable once StaticMemberInGenericType
         private static readonly Timer QueueChecker;
 
         static TimerWheel()
@@ -36,13 +36,22 @@ namespace Orleans.Timers
             QueueChecker = new Timer(state => { CheckQueues(); }, null, timerPeriod, timerPeriod);
         }
 
-        public static void Register(TimerElementHolder<T> element)
+        public static void Register(T element)
         {
             var tl = EnsureCurrentThreadHasQueue();
             try
             {
                 tl.QueueLock.Get();
-                tl.Queue.Enqueue(element);
+
+                // If this is the first element, update the head.
+                if (tl.Head is null) tl.Head = element;
+
+                // If this is not the first element, update the current tail.
+                var prevTail = tl.Tail;
+                if (!(prevTail is null)) prevTail.Next = element;
+
+                // Update the tail.
+                tl.Tail = element;
             }
             finally
             {
@@ -52,8 +61,9 @@ namespace Orleans.Timers
 
         private static void CheckQueues()
         {
-            foreach (var tl in AllThreadLocals.Current)
+            foreach (var tl in AllThreadLocals)
             {
+                var acquired = false;
                 if (tl != null)
                 {
                     try
@@ -63,101 +73,127 @@ namespace Orleans.Timers
                             continue;
                         }
 
-                        CheckQueue(tl.Queue);
+                        acquired = true;
+                        CheckQueueInLock(tl);
                     }
                     finally
                     {
-                        tl.QueueLock.Release();
+                        if (acquired) tl.QueueLock.Release();
                     }
                 }
             }
         }
 
-        // Crawls through the callbacks and timeouts expired ones
-        private static void CheckQueue(Queue<TimerElementHolder<T>> queue)
+        // Crawls through the callbacks and fires expired ones
+        private static void CheckQueueInLock(TimerWheelQueueThreadLocals queue)
         {
             var now = DateTime.UtcNow;
-            while (true)
+            var prev = default(T);
+            for (var current = queue.Head; current != null; prev = current, current = current.Next as T)
             {
-                if (queue.Count == 0)
+                if (current.IsCanceled)
                 {
-                    return;
-                }
+                    Dequeue(queue, prev, current);
 
-                var element = queue.Peek();
-                if (element.IsCancellationRequested)
-                {
-                    queue.Dequeue();
                     continue;
                 }
 
-                if (element.DueTime < now)
+                if (current.DueTime < now)
                 {
-                    queue.Dequeue();
+                    Dequeue(queue, prev, current);
 
-                    element.OnTimeout();
+                    current.OnTimeout();
+                }
+            }
+
+            void Dequeue(TimerWheelQueueThreadLocals locals, T previous, T current)
+            {
+                var next = current.Next as T;
+
+                if (!(previous is null)) previous.Next = next;
+
+                if (ReferenceEquals(locals.Head, current))
+                {
+                    locals.Head = next;
+                }
+
+                if (ReferenceEquals(locals.Tail, current))
+                {
+                    locals.Tail = previous;
                 }
             }
         }
 
-        private static TimerWheelQueueThreadLocals<T> EnsureCurrentThreadHasQueue()
+        private static TimerWheelQueueThreadLocals EnsureCurrentThreadHasQueue()
         {
             if (queueThreadLocals == null)
             {
-                queueThreadLocals = new TimerWheelQueueThreadLocals<T>();
-                AllThreadLocals.Add(queueThreadLocals);
+                queueThreadLocals = new TimerWheelQueueThreadLocals();
+                AddThreadLocals(queueThreadLocals);
+
+                void AddThreadLocals(TimerWheelQueueThreadLocals threadLocals)
+                {
+                    while (true)
+                    {
+                        var currentArray = allThreadLocalsArray;
+                        lock (currentArray)
+                        {
+                            if (currentArray != allThreadLocalsArray)
+                            {
+                                continue;
+                            }
+
+                            for (var i = 0; i < currentArray.Length; i++)
+                            {
+                                if (currentArray[i] == null)
+                                {
+                                    Volatile.Write(ref currentArray[i], threadLocals);
+                                    return;
+                                }
+
+                                if (i == currentArray.Length - 1)
+                                {
+                                    var newArray = new TimerWheelQueueThreadLocals[currentArray.Length * 2];
+                                    Array.Copy(currentArray, newArray, i + 1);
+                                    newArray[i + 1] = threadLocals;
+                                    allThreadLocalsArray = newArray;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             return queueThreadLocals;
         }
-    }
 
-    internal abstract class TimerElementHolder<T> where T : IOnTimeout
-    {
-        protected TimerElementHolder(DateTime dueTime, T target)
+        private sealed class TimerWheelQueueThreadLocals
         {
-            this.DueTime = dueTime;
-            this.Target = target;
+            public readonly RecursiveInterlockedExchangeLock QueueLock = new RecursiveInterlockedExchangeLock();
+            public T Head;
+            public T Tail;
         }
-
-        /// <summary>
-        /// The UTC time after which this timer should fire.
-        /// </summary>
-        public DateTime DueTime { get; }
-
-        public T Target { get; }
-
-        /// <summary>
-        /// True if the timer is cancelled, false otherwise.
-        /// </summary>
-        public abstract bool IsCancellationRequested { get; }
-
-        public void OnTimeout() => this.Target?.OnTimeout();
     }
 
-    internal sealed class DelayTimerElementHolder : TimerElementHolder<DelayAwaitable>
+    internal interface ITimerCallback
     {
-        public DelayTimerElementHolder(DateTime dueTime, DelayAwaitable target) : base(dueTime, target)
-        {
-        }
+        DateTime DueTime { get; }
 
-        public override bool IsCancellationRequested => false;
-    }
+        bool IsCanceled { get; }
 
-    internal interface IOnTimeout
-    {
         void OnTimeout();
-    }
-    
-    internal sealed class TimerWheelQueueThreadLocals<T> where T : IOnTimeout
-    {
-        public readonly InterlockedExchangeLock QueueLock = new InterlockedExchangeLock();
-        public readonly Queue<TimerElementHolder<T>> Queue = new Queue<TimerElementHolder<T>>();
+
+        /// <summary>
+        /// The next timer. This value must never be accessed or modified by user code.
+        /// </summary>
+        ITimerCallback Next { get; set; }
     }
 
-    /// <summary>Provides an awaitable context for switching into a target environment.</summary>
-    /// <remarks>This type is intended for compiler use only.</remarks>
-    public sealed class DelayAwaitable : ICriticalNotifyCompletion, IOnTimeout
+    /// <summary>
+    /// Provides an awaitable which completes at a specified time.
+    /// </summary>
+    public sealed class DelayAwaitable : ICriticalNotifyCompletion, ITimerCallback
     {
         private static readonly Action CompletedSentinel = () => { };
         private static readonly Action<object> TaskSchedulerCallback = RunAction;
@@ -168,6 +204,15 @@ namespace Orleans.Timers
         private object scheduler;
         private ExecutionContext executionContext;
         private Action continuationAction;
+
+        internal DelayAwaitable(DateTime expiry)
+        {
+            this.DueTime = expiry;
+        }
+
+        public DateTime DueTime { get; }
+
+        public bool IsCanceled => false;
 
         /// <summary>Gets an awaiter for this <see cref="DelayAwaitable"/>.</summary>
         /// <returns>An awaiter for this awaitable.</returns>
@@ -191,15 +236,23 @@ namespace Orleans.Timers
 
             this.scheduler = CaptureScheduler();
 
+            // Register the continuation
             var previousContinuation = Interlocked.CompareExchange(ref this.continuationAction, continuation, null);
+
+            // Check that this is the only registered continuation.
             if (!ReferenceEquals(previousContinuation, null))
             {
-                if (!ReferenceEquals(previousContinuation, CompletedSentinel))
+                if (ReferenceEquals(previousContinuation, CompletedSentinel))
                 {
+                    // This awaitable has already completed, schedule the provided continuation.
+                    this.ScheduleContinuation();
+                }
+                else
+                {
+                    // This awaitable only supports a single continuation, therefore throw if the user
+                    // tries to register multiple.
                     ThrowMultipleContinuationsException();
                 }
-
-                this.ScheduleContinuation();
             }
         }
 
@@ -286,74 +339,7 @@ namespace Orleans.Timers
         }
 
         public void OnTimeout() => this.ScheduleContinuation();
-    }
 
-    internal class SparseArray<T> where T : class
-    {
-        private volatile T[] array;
-
-        internal SparseArray(int initialSize)
-        {
-            this.array = new T[initialSize];
-        }
-
-        internal T[] Current => this.array;
-
-        internal int Add(T e)
-        {
-            while (true)
-            {
-                var currentArray = this.array;
-                lock (currentArray)
-                {
-                    for (int i = 0; i < currentArray.Length; i++)
-                    {
-                        if (currentArray[i] == null)
-                        {
-                            Volatile.Write(ref currentArray[i], e);
-                            return i;
-                        }
-                        else if (i == currentArray.Length - 1)
-                        {
-                            // Must resize. If there was a race condition, we start over again.
-                            if (currentArray != this.array)
-                                continue;
-
-                            T[] newArray = new T[currentArray.Length * 2];
-                            Array.Copy(currentArray, newArray, i + 1);
-                            newArray[i + 1] = e;
-                            this.array = newArray;
-                            return i + 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        internal void Remove(T e)
-        {
-            while (true)
-            {
-                T[] currentArray = this.array;
-                lock (currentArray)
-                {
-                    if (currentArray != this.array)
-                    {
-                        continue;
-                    }
-
-                    for (var i = 0; i < currentArray.Length; i++)
-                    {
-                        if (currentArray[i] == e)
-                        {
-                            Volatile.Write(ref currentArray[i], null);
-                            break;
-                        }
-                    }
-
-                    return;
-                }
-            }
-        }
+        ITimerCallback ITimerCallback.Next { get; set; }
     }
 }

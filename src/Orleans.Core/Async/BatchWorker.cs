@@ -7,27 +7,6 @@ using Orleans.Timers;
 
 namespace Orleans
 {
-    /*public static class TimerManager
-    {
-        private static readonly HashedWheelTimer Manager = new HashedWheelTimer(TimeSpan.FromMilliseconds(25), 1024, 0);
-
-        public static async Task Delay(TimeSpan delay)
-        {
-            var awaitable = new TimerCallback();
-            Manager.NewTimeout(awaitable, delay);
-            await awaitable;
-        }
-
-        private class TimerCallback : TimerTask
-        {
-            private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            public void Run(HWT.Timeout timeout) => this.completion.TrySetResult(true);
-
-            public TaskAwaiter<bool> GetAwaiter() => this.completion.Task.GetAwaiter();
-        }
-    }*/
-
     public abstract class SimpleBatchWorker
     {
         private int status;
