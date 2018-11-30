@@ -355,12 +355,12 @@ namespace Orleans.Runtime
                     if (message.Direction == Message.Directions.OneWay)
                     {
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message, exc1);
+                            "Exception during Grain method call of message: {Message}, Exception: {Exception}", message, exc1);
                     }
                     else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
                     {
                         invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message, exc1);
+                            "Exception during Grain method call of message: {Message}, Exception: {Exception}", message, exc1);
                     }
 
                     if (transactionInfo != null)
