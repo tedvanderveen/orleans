@@ -62,7 +62,7 @@ namespace Orleans.Messaging
             data.Add(new ArraySegment<byte>(lengthFields, 0, 2 * sizeof(int)));
 
             // Send the message
-            using (var buffer = new MultiSegmentBufferWriter(maxAllocationSize: 8192, bufferList: data))
+            using (var buffer = new ArrayBufferWriter())
             {
                 int headerLength = 0;
                 try
@@ -72,6 +72,8 @@ namespace Orleans.Messaging
 
                     this.objectSerializer.Serialize(buffer, msg.BodyObject);
                     var bodyLength = buffer.CommitedByteCount - headerLength;
+
+                    data.Add(new ArraySegment<byte>(buffer.ToArray()));
 
                     // Write length prefixes, first header length then body length.
                     var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);

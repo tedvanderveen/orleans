@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -37,6 +38,8 @@ namespace Orleans.Serialization
 
         public List<ArraySegment<byte>> Committed { get; }
         public int CommitedByteCount { get; private set; }
+
+        public List<ArraySegment<byte>> ExpensiveGetOwned => this.Committed.Skip(segmentStartIndex).ToList();
 
         public void Advance(int bytes)
         {
@@ -78,6 +81,7 @@ namespace Orleans.Serialization
 
             var newBuffer = ArrayPool<byte>.Shared.Rent(Math.Min(sizeHint, this.maxAllocationSize));
             this.current.AsSpan().CopyTo(newBuffer.AsSpan());
+            if (current != null && current.Count > 0) ArrayPool<byte>.Shared.Return(current.Array);
             this.current = new ArraySegment<byte>(newBuffer, 0, newBuffer.Length);
             return this.current;
         }
@@ -92,6 +96,7 @@ namespace Orleans.Serialization
 
             var newBuffer = ArrayPool<byte>.Shared.Rent(Math.Min(sizeHint, this.maxAllocationSize));
             this.current.AsSpan().CopyTo(newBuffer.AsSpan());
+            if (current != null && current.Count > 0) ArrayPool<byte>.Shared.Return(current.Array);
             this.current = new ArraySegment<byte>(newBuffer, 0, newBuffer.Length);
             return this.current;
         }
@@ -151,8 +156,45 @@ namespace Orleans.Serialization
             return ReadOnlyBufferSegment.Create(buffers, offset, length);
         }
 
+        public static ReadOnlySequence<byte> CreateReadOnlySequence(List<ArraySegment<byte>> buffers)
+        {
+            return ReadOnlyBufferSegment.Create(buffers);
+        }
+
         private class ReadOnlyBufferSegment : ReadOnlySequenceSegment<byte>
         {
+            public static ReadOnlySequence<byte> Create(List<ArraySegment<byte>> buffers)
+            {
+                ReadOnlyBufferSegment segment = null;
+                ReadOnlyBufferSegment first = null;
+                foreach (var buffer in buffers)
+                {
+                    var newSegment = new ReadOnlyBufferSegment
+                    {
+                        Memory = buffer,
+                    };
+
+                    if (segment != null)
+                    {
+                        segment.Next = newSegment;
+                        newSegment.RunningIndex = segment.RunningIndex + segment.Memory.Length;
+                    }
+                    else
+                    {
+                        first = newSegment;
+                    }
+
+                    segment = newSegment;
+                }
+
+                if (first == null)
+                {
+                    first = segment = new ReadOnlyBufferSegment();
+                }
+
+                return new ReadOnlySequence<byte>(first, 0, segment, segment.Memory.Length);
+            }
+
             public static ReadOnlySequence<byte> Create(IEnumerable<Memory<byte>> buffers)
             {
                 ReadOnlyBufferSegment segment = null;
@@ -212,7 +254,7 @@ namespace Orleans.Serialization
                     if (segment != null)
                     {
                         segment.Next = newSegment;
-                        newSegment.RunningIndex = segment.RunningIndex + segment.Memory.Length;
+                        newSegment.RunningIndex = segment.RunningIndex + segmentLength;
                     }
                     else
                     {

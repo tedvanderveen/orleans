@@ -556,7 +556,7 @@ namespace Orleans.Runtime.Messaging
                 data.Add(new ArraySegment<byte>(lengthFields, 0, 2 * sizeof(int)));
 
                 // Send the message
-                using (var buffer = new MultiSegmentBufferWriter(maxAllocationSize: 8192, bufferList: data))
+                using (var buffer = new ArrayBufferWriter())
                 {
                     int headerLength;
                     try
@@ -566,6 +566,7 @@ namespace Orleans.Runtime.Messaging
 
                         this.bodySerializer.Serialize(buffer, msg.BodyObject);
                         var bodyLength = buffer.CommitedByteCount - headerLength;
+                        data.Add(new ArraySegment<byte>(buffer.ToArray()));
 
                         // Write length prefixes, first header length then body length.
                         var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
@@ -592,7 +593,7 @@ namespace Orleans.Runtime.Messaging
                     try
                     {
                         var messageLength = buffer.CommitedByteCount + lengthFields.Length;
-                        bytesSent = sock.Send(buffer.Committed);
+                        bytesSent = sock.Send(data);
                         if (bytesSent != messageLength)
                         {
                             // The complete message wasn't sent, even though no error was reported; treat this as an error

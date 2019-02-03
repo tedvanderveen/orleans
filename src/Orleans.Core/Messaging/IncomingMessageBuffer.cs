@@ -161,11 +161,11 @@ namespace Orleans.Runtime
 
             // decode header
             int headerOffset = decodeOffset + Message.LENGTH_HEADER_SIZE;
-            var header = ReadOnlySequenceHelper.CreateReadOnlySequence(readBuffer, headerOffset, headerLength);
+            var header = ReadOnlySequenceHelper.CreateReadOnlySequence(ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, headerOffset, headerLength));
 
             // decode body
             int bodyOffset = headerOffset + headerLength;
-            var body = ReadOnlySequenceHelper.CreateReadOnlySequence(readBuffer, bodyOffset, bodyLength);
+            var body = ReadOnlySequenceHelper.CreateReadOnlySequence(ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength));
 
             // build message
             this.messageHeadersSerializer.Deserialize(header, out var headersContainer);
