@@ -556,27 +556,27 @@ namespace Orleans.Runtime.Messaging
                 data.Add(new ArraySegment<byte>(lengthFields, 0, 2 * sizeof(int)));
 
                 // Send the message
-                using (var buffer = new ArrayBufferWriter())
+                using (var buffer = new MemoryBufferWriter())
                 {
                     int headerLength;
                     try
                     {
                         this.messageHeadersSerializer.Serialize(buffer, msg.Headers);
-                        headerLength = buffer.CommitedByteCount;
+                        headerLength = buffer.BytesWritten;
 
                         this.bodySerializer.Serialize(buffer, msg.BodyObject);
-                        var bodyLength = buffer.CommitedByteCount - headerLength;
-                        data.Add(new ArraySegment<byte>(buffer.ToArray()));
+                        var bodyLength = buffer.BytesWritten - headerLength;
+                        data.AddRange(buffer.GetSegments());
 
                         // Write length prefixes, first header length then body length.
                         var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
                         lengthPrefixes[0] = headerLength;
                         lengthPrefixes[1] = bodyLength;
 
-                        if (buffer.CommitedByteCount > this.messagingOptions.LargeMessageWarningThreshold)
+                        if (buffer.BytesWritten > this.messagingOptions.LargeMessageWarningThreshold)
                         {
                             Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} Msg={3}",
-                                buffer.CommitedByteCount, headerLength, bodyLength, msg.ToString());
+                                buffer.BytesWritten, headerLength, bodyLength, msg.ToString());
                             if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Sending large message {0}", msg.ToLongString());
                         }
                     }
@@ -592,7 +592,7 @@ namespace Orleans.Runtime.Messaging
                     string sendErrorStr;
                     try
                     {
-                        var messageLength = buffer.CommitedByteCount + lengthFields.Length;
+                        var messageLength = buffer.BytesWritten + lengthFields.Length;
                         bytesSent = sock.Send(data);
                         if (bytesSent != messageLength)
                         {

@@ -47,7 +47,7 @@ namespace Orleans.Serialization
             this.serializationManager.Serialize(value, writer);
             writer.Commit();
 
-            if (output is MultiSegmentBufferWriter multiSegment)
+            /*if (output is MultiSegmentBufferWriter multiSegment)
             {
                 try
                 {
@@ -58,7 +58,7 @@ namespace Orleans.Serialization
                 {
                     Debug.WriteLine(exception);
                 }
-            }
+            }*/
         }
     }
 

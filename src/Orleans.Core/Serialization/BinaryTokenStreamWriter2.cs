@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -9,12 +10,13 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
+
+    // NOTE: This is broken - do not use it.
     public sealed class MultiSegmentBufferWriter : IBufferWriter<byte>, IDisposable
     {
         private static readonly ArraySegment<byte> EmptySegment = new ArraySegment<byte>(Array.Empty<byte>(), 0, 0);
@@ -39,7 +41,7 @@ namespace Orleans.Serialization
         public List<ArraySegment<byte>> Committed { get; }
         public int CommitedByteCount { get; private set; }
 
-        public List<ArraySegment<byte>> ExpensiveGetOwned => this.Committed.Skip(segmentStartIndex).ToList();
+        public List<ArraySegment<byte>> ExpensiveGetOwned => this.Committed.Skip(this.segmentStartIndex).ToList();
 
         public void Advance(int bytes)
         {
@@ -81,7 +83,7 @@ namespace Orleans.Serialization
 
             var newBuffer = ArrayPool<byte>.Shared.Rent(Math.Min(sizeHint, this.maxAllocationSize));
             this.current.AsSpan().CopyTo(newBuffer.AsSpan());
-            if (current != null && current.Count > 0) ArrayPool<byte>.Shared.Return(current.Array);
+            if (this.current != null && this.current.Count > 0) ArrayPool<byte>.Shared.Return(this.current.Array);
             this.current = new ArraySegment<byte>(newBuffer, 0, newBuffer.Length);
             return this.current;
         }
@@ -96,7 +98,7 @@ namespace Orleans.Serialization
 
             var newBuffer = ArrayPool<byte>.Shared.Rent(Math.Min(sizeHint, this.maxAllocationSize));
             this.current.AsSpan().CopyTo(newBuffer.AsSpan());
-            if (current != null && current.Count > 0) ArrayPool<byte>.Shared.Return(current.Array);
+            if (this.current != null && this.current.Count > 0) ArrayPool<byte>.Shared.Return(this.current.Array);
             this.current = new ArraySegment<byte>(newBuffer, 0, newBuffer.Length);
             return this.current;
         }
@@ -125,6 +127,223 @@ namespace Orleans.Serialization
 
             this.current = EmptySegment;
             this.Committed.Clear();
+        }
+    }
+
+    internal sealed class MemoryBufferWriter : IDisposable, IBufferWriter<byte>
+    {
+        private readonly int _minimumSegmentSize;
+        private int _bytesWritten;
+
+        private List<ArraySegment<byte>> _completedSegments;
+        private byte[] _currentSegment;
+        private int _position;
+
+        public MemoryBufferWriter(int minimumSegmentSize = 4096)
+        {
+            _minimumSegmentSize = minimumSegmentSize;
+        }
+
+        public void Reset()
+        {
+            if (_completedSegments != null)
+            {
+                for (var i = 0; i < _completedSegments.Count; i++)
+                {
+                    ArrayPool<byte>.Shared.Return(_completedSegments[i].Array);
+                }
+
+                _completedSegments.Clear();
+            }
+
+            if (_currentSegment != null)
+            {
+                ArrayPool<byte>.Shared.Return(_currentSegment);
+                _currentSegment = null;
+            }
+
+            _bytesWritten = 0;
+            _position = 0;
+        }
+
+        public void Advance(int count)
+        {
+            _bytesWritten += count;
+            _position += count;
+        }
+
+        public int BytesWritten => _bytesWritten;
+
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            EnsureCapacity(sizeHint);
+
+            return _currentSegment.AsMemory(_position, _currentSegment.Length - _position);
+        }
+
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            EnsureCapacity(sizeHint);
+
+            return _currentSegment.AsSpan(_position, _currentSegment.Length - _position);
+        }
+        
+        private void EnsureCapacity(int sizeHint)
+        {
+            // This does the Right Thing. It only subtracts _position from the current segment length if it's non-null.
+            // If _currentSegment is null, it returns 0.
+            var remainingSize = _currentSegment?.Length - _position ?? 0;
+
+            // If the sizeHint is 0, any capacity will do
+            // Otherwise, the buffer must have enough space for the entire size hint, or we need to add a segment.
+            if (sizeHint == 0 && remainingSize > 0 || sizeHint > 0 && remainingSize >= sizeHint)
+            {
+                // We have capacity in the current segment
+                return;
+            }
+
+            AddSegment(sizeHint);
+        }
+
+        private void AddSegment(int sizeHint = 0)
+        {
+            if (_currentSegment != null)
+            {
+                // We're adding a segment to the list
+                if (_completedSegments == null)
+                {
+                    _completedSegments = new List<ArraySegment<byte>>();
+                }
+
+                // Position might be less than the segment length if there wasn't enough space to satisfy the sizeHint when
+                // GetMemory was called. In that case we'll take the current segment and call it "completed", but need to
+                // ignore any empty space in it.
+
+                IncludeCurrentSegment();
+            }
+
+            // Get a new buffer using the minimum segment size, unless the size hint is larger than a single segment.
+            _currentSegment = ArrayPool<byte>.Shared.Rent(Math.Max(_minimumSegmentSize, sizeHint));
+            _position = 0;
+        }
+
+        private void IncludeCurrentSegment()
+        {
+            var last = this._completedSegments.Count - 1;
+            if (last >= 0 && ReferenceEquals(this._completedSegments[last].Array, _currentSegment))
+            {
+                // Extend the existing committed segment.
+                _completedSegments[last] = new ArraySegment<byte>(_currentSegment, 0, _position);
+            }
+            else
+            {
+                _completedSegments.Add(new ArraySegment<byte>(_currentSegment, 0, _position));
+            }
+        }
+
+        public List<ArraySegment<byte>> GetSegments()
+        {
+            if (_completedSegments == null)
+            {
+                _completedSegments = new List<ArraySegment<byte>>(1);
+            }
+
+            IncludeCurrentSegment();
+
+            return _completedSegments;
+        }
+
+        public byte[] ToArray()
+        {
+            if (_currentSegment == null)
+            {
+                return Array.Empty<byte>();
+            }
+
+            var result = new byte[_bytesWritten];
+
+            var totalWritten = 0;
+
+            if (_completedSegments != null)
+            {
+                // Copy full segments
+                var count = _completedSegments.Count;
+                for (var i = 0; i < count; i++)
+                {
+                    var segment = _completedSegments[i];
+                    segment.Array.CopyTo(result.AsSpan(totalWritten));
+                    totalWritten += segment.Count;
+                }
+            }
+
+            // Copy current incomplete segment
+            _currentSegment.AsSpan(0, _position).CopyTo(result.AsSpan(totalWritten));
+
+            return result;
+        }
+
+        public void CopyTo(Span<byte> span)
+        {
+            Debug.Assert(span.Length >= _bytesWritten);
+
+            if (_currentSegment == null)
+            {
+                return;
+            }
+
+            var totalWritten = 0;
+
+            if (_completedSegments != null)
+            {
+                // Copy full segments
+                var count = _completedSegments.Count;
+                for (var i = 0; i < count; i++)
+                {
+                    var segment = _completedSegments[i];
+                    segment.Array.CopyTo(span.Slice(totalWritten));
+                    totalWritten += segment.Count;
+                }
+            }
+
+            // Copy current incomplete segment
+            _currentSegment.AsSpan(0, _position).CopyTo(span.Slice(totalWritten));
+
+            Debug.Assert(_bytesWritten == totalWritten + _position);
+        }
+
+        public void Dispose()
+        {
+            this.Dispose(true);
+        }
+        
+        public void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Reset();
+            }
+        }
+
+        /// <summary>
+        /// Holds a byte[] from the pool and a size value. Basically a Memory but guaranteed to be backed by an ArrayPool byte[], so that we know we can return it.
+        /// </summary>
+        private readonly struct CompletedBuffer
+        {
+            public byte[] Buffer { get; }
+            public int Length { get; }
+
+            public ReadOnlySpan<byte> Span => Buffer.AsSpan(0, Length);
+
+            public CompletedBuffer(byte[] buffer, int length)
+            {
+                Buffer = buffer;
+                Length = length;
+            }
+
+            public void Return()
+            {
+                ArrayPool<byte>.Shared.Return(Buffer);
+            }
         }
     }
 
