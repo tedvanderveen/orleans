@@ -14,7 +14,7 @@ namespace Orleans.Serialization
         /// <typeparam name="TBufferWriter"></typeparam>
         /// <param name="output">The output buffer writer.</param>
         /// <param name="value">The value being serialized.</param>
-        void Serialize<TBufferWriter>(TBufferWriter output, in T value) where TBufferWriter : IBufferWriter<byte>;
+        void Serialize<TBufferWriter>(TBufferWriter output, T value) where TBufferWriter : IBufferWriter<byte>;
         
         /// <summary>
         /// Deserializes a value from the provided input buffer.
