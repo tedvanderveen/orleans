@@ -8,6 +8,8 @@ using Orleans.Serialization;
 using System.Threading.Tasks;
 using Pipelines.Sockets.Unofficial;
 using System.Buffers.Binary;
+using System.IO.Pipelines;
+using System.Buffers;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -403,7 +405,9 @@ namespace Orleans.Runtime.Messaging
 
         private async Task SocketReadPump(Socket sock)
         {
-            var connection = SocketConnection.Create(sock/*, socketConnectionOptions: SocketConnectionOptions.InlineReads*/);
+            SocketConnection.SetRecommendedServerOptions(sock);
+            var pipeOptions = new PipeOptions(pauseWriterThreshold: int.MaxValue, useSynchronizationContext: false);
+            var connection = SocketConnection.Create(sock, pipeOptions, socketConnectionOptions: SocketConnectionOptions.InlineReads);
             var input = connection.Input;
             var headerLength = 0;
             var bodyLength = 0;
@@ -411,7 +415,7 @@ namespace Orleans.Runtime.Messaging
             {
                 try
                 {
-                    var readResult = await input.ReadAsync(this.Cts.Token);
+                    if (!input.TryRead(out var readResult)) readResult = await input.ReadAsync(this.Cts.Token);
                     if (readResult.IsCanceled || readResult.IsCompleted)
                     {
                         this.Log.LogInformation("Socket closed");
@@ -420,7 +424,7 @@ namespace Orleans.Runtime.Messaging
 
                     var buffer = readResult.Buffer;
                     var bufferLength = buffer.Length;
-                    if (bufferLength < headerLength + bodyLength || bufferLength < 2 * sizeof(int))
+                    if (bufferLength < 2 * sizeof(int) + headerLength + bodyLength)
                     {
                         input.AdvanceTo(readResult.Buffer.Start, readResult.Buffer.End);
                         continue;
@@ -428,18 +432,24 @@ namespace Orleans.Runtime.Messaging
 
                     if (headerLength == 0)
                     {
-                        // TODO: this might fail if the span is too short.
-                        headerLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.First.Span);
-                        bodyLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.First.Span.Slice(sizeof(int)));
+                        void ReadLengths(in ReadOnlySequence<byte> s, out int h, out int b)
+                        {
+                            Span<byte> span = stackalloc byte[8];
+                            buffer.Slice(0, 2 * sizeof(int)).CopyTo(span);
+                            h = BinaryPrimitives.ReadInt32LittleEndian(span);
+                            b = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(sizeof(int)));
+                        }
 
+                        ReadLengths(buffer, out headerLength, out bodyLength);
+                        
                         if (headerLength == 0 || bodyLength == 0)
                         {
                             // TODO: handle this better
                             this.Log.LogError("Message size cannot be zero");
                             break;
                         }
-
-                        if (bufferLength < headerLength + bodyLength)
+                        
+                        if (bufferLength < 2* sizeof(int) + headerLength + bodyLength)
                         {
                             input.AdvanceTo(buffer.Start, buffer.End);
                             continue;
@@ -449,7 +459,7 @@ namespace Orleans.Runtime.Messaging
                     // TODO: Use a single serializer for the whole message.
                     buffer = buffer.Slice(2 * sizeof(int));
                     this.messageHeadersSerializer.Deserialize(buffer, out var header);
-                    buffer = buffer.Slice(headerLength);
+                    buffer = buffer.Slice(headerLength, bodyLength);
                     this.objectSerializer.Deserialize(buffer, out var body);
 
                     var message = new Message
@@ -459,7 +469,7 @@ namespace Orleans.Runtime.Messaging
                     };
                     this.HandleMessage(message, sock);
 
-                    input.AdvanceTo(readResult.Buffer.GetPosition(2 * sizeof(int) + headerLength + bodyLength));
+                    input.AdvanceTo(buffer.End);
 
                     headerLength = 0;
                     bodyLength = 0;
