@@ -417,7 +417,16 @@ namespace Orleans.Runtime
                 targetActivation.RecordRunning(message, message.IsAlwaysInterleave);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
+            }
+
+            var workItem = new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger);
+            if (ReferenceEquals(RuntimeContext.CurrentActivationContext, targetActivation.SchedulingContext))
+            {
+                workItem.Execute();
+            }
+            else
+            {
+                scheduler.QueueWorkItem(workItem, targetActivation.SchedulingContext);
             }
         }
 
