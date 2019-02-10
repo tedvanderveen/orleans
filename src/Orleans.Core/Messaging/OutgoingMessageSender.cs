@@ -62,25 +62,25 @@ namespace Orleans.Messaging
             data.Add(new ArraySegment<byte>(lengthFields, 0, 2 * sizeof(int)));
 
             // Send the message
-            using (var buffer = new MemoryBufferWriter())
+            using (var buffer = new ArrayBufferWriter())
             {
                 int headerLength = 0;
                 try
                 {
                     this.messageHeadersSerializer.Serialize(buffer, msg.Headers);
-                    headerLength = buffer.BytesWritten;
+                    headerLength = buffer.CommitedByteCount;
 
                     this.objectSerializer.Serialize(buffer, msg.BodyObject);
-                    var bodyLength = buffer.BytesWritten - headerLength;
+                    var bodyLength = buffer.CommitedByteCount - headerLength;
 
-                    data.AddRange(buffer.GetSegments());
+                    data.Add(new ArraySegment<byte>(buffer.ToArray()));
 
                     // Write length prefixes, first header length then body length.
                     var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
                     lengthPrefixes[0] = headerLength;
                     lengthPrefixes[1] = bodyLength;
 
-                    if (buffer.BytesWritten > this.serializationManager.LargeObjectSizeThreshold)
+                    if (buffer.CommitedByteCount > this.serializationManager.LargeObjectSizeThreshold)
                     {
                         this.Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
                             headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
