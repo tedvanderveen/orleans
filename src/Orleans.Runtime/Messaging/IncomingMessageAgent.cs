@@ -6,7 +6,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class IncomingMessageAgent : AsynchAgent2
+    internal class IncomingMessageAgent : TaskSchedulerAgent
     {
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory directory;
@@ -50,10 +50,7 @@ namespace Orleans.Runtime.Messaging
 
                 var vt = reader.WaitToReadAsync(ct);
                 var res = vt.IsCompletedSuccessfully ? vt.GetAwaiter().GetResult() : await vt.ConfigureAwait(false);
-                if (!res)
-                {
-                    return;
-                }
+                if (!res && reader.Completion.IsCompleted) return;
 
                 // Get an application message
                 while (reader.TryRead(out var msg))
@@ -62,10 +59,12 @@ namespace Orleans.Runtime.Messaging
                     {
                         if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Dequeued a null message, exiting");
                         // Null return means cancelled
-                        return;
+                        continue;
                     }
-
-                    ReceiveMessage(msg);
+                    else
+                    {
+                        ReceiveMessage(msg);
+                    }
                 }
             }
         }

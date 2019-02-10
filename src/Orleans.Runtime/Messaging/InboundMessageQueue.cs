@@ -97,7 +97,6 @@ namespace Orleans.Runtime.Messaging
                     this.log.Trace("Queued incoming {0} message", msg.Category.ToString());
                 }
             }
-
         }
 
         public ChannelReader<Message> GetReader(Message.Categories type)
