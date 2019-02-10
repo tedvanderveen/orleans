@@ -52,6 +52,7 @@
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
     <SystemThreadingTasksExtensionsVersion>4.5.0</SystemThreadingTasksExtensionsVersion>
+    <SystemThreadingChannelsVersion>4.5.0</SystemThreadingChannelsVersion>
     <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
 
     <!-- Microsoft packages -->
