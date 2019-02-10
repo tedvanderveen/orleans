@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
 using System.Threading.Tasks;
+using Pipelines.Sockets.Unofficial;
+using System.Buffers.Binary;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -367,11 +369,13 @@ namespace Orleans.Runtime.Messaging
                         // Add the socket to the open socket collection
                         if (ima.RecordOpenedSocket(sock))
                         {
+                            Task.Run(() => this.SocketReadPump(sock));
+
                             // Get the socket for the accepted client connection and put it into the 
                             // ReadEventArg object user token.
-                            var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
+                            //var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
 
-                            StartReceiveAsync(sock, readEventArgs, ima);
+                            //StartReceiveAsync(sock, readEventArgs, ima);
                         }
                         else
                         {
@@ -394,6 +398,82 @@ namespace Orleans.Runtime.Messaging
                 var logger = ima?.Log ?? this.Log;
                 logger.Error(ErrorCode.Messaging_IMA_ExceptionAccepting, "Unexpected exception in IncomingMessageAccepter.AcceptCallback", ex);
                 RestartAcceptingSocket();
+            }
+        }
+
+        private async Task SocketReadPump(Socket sock)
+        {
+            var connection = SocketConnection.Create(sock/*, socketConnectionOptions: SocketConnectionOptions.InlineReads*/);
+            var input = connection.Input;
+            var headerLength = 0;
+            var bodyLength = 0;
+            while (!this.Cts.IsCancellationRequested)
+            {
+                try
+                {
+                    var readResult = await input.ReadAsync(this.Cts.Token);
+                    if (readResult.IsCanceled || readResult.IsCompleted)
+                    {
+                        this.Log.LogInformation("Socket closed");
+                        break;
+                    }
+
+                    var buffer = readResult.Buffer;
+                    var bufferLength = buffer.Length;
+                    if (bufferLength < headerLength + bodyLength || bufferLength < 2 * sizeof(int))
+                    {
+                        input.AdvanceTo(readResult.Buffer.Start, readResult.Buffer.End);
+                        continue;
+                    }
+
+                    if (headerLength == 0)
+                    {
+                        // TODO: this might fail if the span is too short.
+                        headerLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.First.Span);
+                        bodyLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.First.Span.Slice(sizeof(int)));
+
+                        if (headerLength == 0 || bodyLength == 0)
+                        {
+                            // TODO: handle this better
+                            this.Log.LogError("Message size cannot be zero");
+                            break;
+                        }
+
+                        if (bufferLength < headerLength + bodyLength)
+                        {
+                            input.AdvanceTo(buffer.Start, buffer.End);
+                            continue;
+                        }
+                    }
+
+                    // TODO: Use a single serializer for the whole message.
+                    buffer = buffer.Slice(2 * sizeof(int));
+                    this.messageHeadersSerializer.Deserialize(buffer, out var header);
+                    buffer = buffer.Slice(headerLength);
+                    this.objectSerializer.Deserialize(buffer, out var body);
+
+                    var message = new Message
+                    {
+                        Headers = header,
+                        BodyObject = body
+                    };
+                    this.HandleMessage(message, sock);
+
+                    input.AdvanceTo(readResult.Buffer.GetPosition(2 * sizeof(int) + headerLength + bodyLength));
+
+                    headerLength = 0;
+                    bodyLength = 0;
+                }
+                catch (Exception exception)
+                {
+                    this.Log.LogWarning("Exception reading from socket: {Exception}", exception);
+                }
+            }
+
+            if (connection.ShutdownKind == PipeShutdownKind.None)
+            {
+                // TODO: I imagine this is the wrong way to close the read side.
+                connection.Input.Complete();
             }
         }
 

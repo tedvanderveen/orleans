@@ -53,6 +53,7 @@
     <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
     <PackageReference Include="System.Xml.XmlDocument" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Xml.XPath.XmlDocument" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="Pipelines.Sockets.Unofficial" Version="1.0.9" />
   </ItemGroup>
 
 </Project>
