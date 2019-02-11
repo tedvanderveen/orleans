@@ -59,6 +59,7 @@
     <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>2.8.2</MicrosoftCodeAnalysisVersion>
 
+    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>2.2.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>2.0.0</MicrosoftExtensionsConfigurationBinderVersion>
     <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
     <MicrosoftExtensionsConfigurationJsonVersion>2.0.0</MicrosoftExtensionsConfigurationJsonVersion>

@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsHostingAbstractionsVersion)" />
     <PackageReference Include="System.Threading.Channels" Version="$(SystemThreadingChannelsVersion)" />
+    <PackageReference Include="Microsoft.AspNetCore.Connections.Abstractions" Version="$(MicrosoftAspNetCoreConnectionsAbstractionsVersion)" />
   </ItemGroup>
 
 </Project>
