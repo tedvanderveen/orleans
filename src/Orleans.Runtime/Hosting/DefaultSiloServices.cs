@@ -39,6 +39,8 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
+using Orleans.Runtime.Messaging.RePlat;
+using Orleans.Messaging.RePlat;
 
 namespace Orleans.Hosting
 {
@@ -299,6 +301,20 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, GrainCollectionOptionsValidator>();
 
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
+
+            // Networking
+            services.TryAddSingleton<ConnectionManager>();
+            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddSingleton<IConnectionListenerFactory, SocketConnectionListenerFactory>();
+            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
+            services.TryAddSingleton<ConnectionComponentFactory, SiloConnectionComponentFactory>();
+            services.TryAddSingleton<OutboundConnectionFactory, SiloOutboundConnectionFactory>();
+            services.TryAddTransient(typeof(ISerializer<>), typeof(OrleansSerializer<>));
+            services.TryAddTransient(typeof(OrleansSerializer<>));
+
+            // Use Orleans socket server.
+            services.AddSingleton<OrleansServer>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, OrleansServer>();
         }
     }
 }
