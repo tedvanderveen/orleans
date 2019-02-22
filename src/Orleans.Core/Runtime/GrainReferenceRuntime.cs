@@ -81,8 +81,9 @@ namespace Orleans.Runtime
 
                 return Task.FromResult(default(T));
             }
-
+#if !NETCOREAPP
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
+#endif
             return resultTask.ToTypedTask<T>();
         }
 
