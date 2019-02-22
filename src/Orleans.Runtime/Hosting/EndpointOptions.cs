@@ -1,11 +1,4 @@
-using Microsoft.AspNetCore.Connections;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Messaging;
-using System;
-using System.Collections.Generic;
+﻿using Orleans.Runtime.Configuration;
 using System.Net;
 using System.Net.Sockets;
 
@@ -44,6 +37,5 @@ namespace Orleans.Configuration
         /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="GatewayPort"/>
         /// </summary>
         public IPEndPoint GatewayListeningEndpoint { get; set; }
-
     }
 }

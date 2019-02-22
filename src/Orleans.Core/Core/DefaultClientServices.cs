@@ -58,7 +58,6 @@ namespace Orleans
             // Serialization
             services.TryAddSingleton<SerializationManager>(sp => ActivatorUtilities.CreateInstance<SerializationManager>(sp,
                 sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.LargeMessageWarningThreshold));
-            services.TryAddSingleton(typeof(ISerializer<>), typeof(OrleansSerializer<>));
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
             services.TryAddSingleton<IFieldUtils, FieldUtils>();
             services.AddSingleton<BinaryFormatterSerializer>();
@@ -95,8 +94,6 @@ namespace Orleans
             services.TryAddSingleton<OutboundConnectionFactory, ClientOutboundConnectionFactory>();
             services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
-            services.TryAddTransient(typeof(ISerializer<>), typeof(OrleansSerializer<>));
-            services.TryAddTransient(typeof(OrleansSerializer<>));
         }
     }
 }

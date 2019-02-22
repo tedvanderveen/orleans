@@ -11,12 +11,6 @@ using Microsoft.AspNetCore.Connections;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal interface IGatewayListener
-    {
-        void Start();
-        void Stop();
-    }
-
     internal class Gateway
     {
         private readonly MessageCenter messageCenter;

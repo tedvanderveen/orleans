@@ -46,7 +46,6 @@ namespace Orleans.Runtime.Messaging
 
         public MessageCenter(
             ILocalSiloDetails siloDetails,
-            IOptions<EndpointOptions> endpointOptions,
             IOptions<SiloMessagingOptions> messagingOptions,
             IOptions<NetworkingOptions> networkingOptions,
             MessageFactory messageFactory,
@@ -61,7 +60,7 @@ namespace Orleans.Runtime.Messaging
             this.log = loggerFactory.CreateLogger<MessageCenter>();
             this.messageFactory = messageFactory;
             this.MyAddress = siloDetails.SiloAddress;
-            this.Initialize(endpointOptions, networkingOptions, statisticsOptions);
+            this.Initialize(networkingOptions, statisticsOptions);
             if (siloDetails.GatewayAddress != null)
             {
                 Gateway = gatewayFactory(this);
@@ -70,9 +69,7 @@ namespace Orleans.Runtime.Messaging
             messageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
         }
 
-        private void Initialize(IOptions<EndpointOptions> endpointOptions,
-            IOptions<NetworkingOptions> networkingOptions,
-            IOptions<StatisticsOptions> statisticsOptions)
+        private void Initialize(IOptions<NetworkingOptions> networkingOptions, IOptions<StatisticsOptions> statisticsOptions)
         {
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 

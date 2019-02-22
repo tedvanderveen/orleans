@@ -309,8 +309,6 @@ namespace Orleans.Hosting
             services.TryAddTransient<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionComponentFactory, SiloConnectionComponentFactory>();
             services.TryAddSingleton<OutboundConnectionFactory, SiloOutboundConnectionFactory>();
-            services.TryAddTransient(typeof(ISerializer<>), typeof(OrleansSerializer<>));
-            services.TryAddTransient(typeof(OrleansSerializer<>));
 
             // Use Orleans socket server.
             services.AddSingleton<OrleansServer>();

@@ -8,5 +8,6 @@ namespace TestGrainContracts
     {
         Task<string> SayHelloKestrel(string name);
         Task<string> HelloChain(int id);
+        Task Ping();
     }
 }

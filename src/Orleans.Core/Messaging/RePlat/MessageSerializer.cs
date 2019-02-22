@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Orleans.Serialization;
 
 using Microsoft;
@@ -17,10 +16,10 @@ namespace Orleans.Runtime.Messaging
         private readonly OrleansSerializer<Message.HeadersContainer> messageHeadersSerializer;
         private readonly OrleansSerializer<object> objectSerializer;
 
-        public MessageSerializer(OrleansSerializer<Message.HeadersContainer> headersSerializer, OrleansSerializer<object> objectSerializer)
+        public MessageSerializer(SerializationManager serializationManager)
         {
-            this.messageHeadersSerializer = headersSerializer;
-            this.objectSerializer = objectSerializer;
+            this.messageHeadersSerializer = new OrleansSerializer<Message.HeadersContainer>(serializationManager);
+            this.objectSerializer = new OrleansSerializer<object>(serializationManager);
         }
 
         public int TryRead(ref ReadOnlySequence<byte> input, out Message message)
@@ -55,12 +54,12 @@ namespace Orleans.Runtime.Messaging
             var body = input.Slice(bodyOffset, bodyLength);
 
             // build message
-            this.messageHeadersSerializer.Deserialize(header, out var headersContainer);
+            this.messageHeadersSerializer.Deserialize(ref header, out var headersContainer);
             message = new Message
             {
                 Headers = headersContainer
             };
-            this.objectSerializer.Deserialize(body, out var bodyObject);
+            this.objectSerializer.Deserialize(ref body, out var bodyObject);
             message.BodyObject = bodyObject;
 
             input = input.Slice(requiredBytes);
@@ -70,10 +69,10 @@ namespace Orleans.Runtime.Messaging
         public void Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
             var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 10240);
-            this.messageHeadersSerializer.Serialize(buffer, message.Headers);
+            this.messageHeadersSerializer.Serialize(ref buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
 
-            this.objectSerializer.Serialize(buffer, message.BodyObject);
+            this.objectSerializer.Serialize(ref buffer, message.BodyObject);
             var bodyLength = buffer.CommittedBytes - headerLength;
 
             // Write length prefixes, first header length then body length.
@@ -82,6 +81,39 @@ namespace Orleans.Runtime.Messaging
             BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodyLength);
 
             buffer.Complete(lengthFields);
+        }
+
+        private sealed class OrleansSerializer<T>
+        {
+            private readonly SerializationManager serializationManager;
+            private readonly BinaryTokenStreamReader2 reader = new BinaryTokenStreamReader2();
+            private object writerCache;
+
+            public OrleansSerializer(SerializationManager serializationManager)
+            {
+                this.serializationManager = serializationManager;
+            }
+
+            public void Deserialize(ref ReadOnlySequence<byte> input, out T value)
+            {
+                reader.Reset(ref input);
+                value = this.serializationManager.Deserialize<T>(reader);
+            }
+
+            public void Serialize<TBufferWriter>(ref TBufferWriter output, T value) where TBufferWriter : IBufferWriter<byte>
+            {
+                if (writerCache is BinaryTokenStreamWriter2<TBufferWriter> writer)
+                {
+                    writer.Reset(output);
+                }
+                else
+                {
+                    writerCache = writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
+                }
+
+                this.serializationManager.Serialize(value, writer);
+                writer.Commit();
+            }
         }
     }
 

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using TestExtensions;
 using Xunit;
@@ -21,16 +22,14 @@ namespace UnitTests.Serialization
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
         private readonly MessageFactory messageFactory;
-        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
-        private readonly ISerializer<object> objectSerializer;
+        private readonly IMessageSerializer messageSerializer;
 
         public MessageSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
             this.messageFactory = this.fixture.Services.GetRequiredService<MessageFactory>();
-            this.messageHeadersSerializer = this.fixture.Services.GetRequiredService<ISerializer<Message.HeadersContainer>>();
-            this.objectSerializer = this.fixture.Services.GetRequiredService<ISerializer<object>>();
+            this.messageSerializer = this.fixture.Services.GetRequiredService<IMessageSerializer>();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -66,26 +65,12 @@ namespace UnitTests.Serialization
 
         private Message RoundTripMessage(Message message)
         {
-            Message deserializedMessage;
-            var segments = new List<ArraySegment<byte>>(4);
-            var lengthFields = new byte[2 * sizeof(int)];
-            segments.Add(new ArraySegment<byte>(lengthFields, 0, lengthFields.Length));
-            using (var buffer = new ArrayBufferWriter())
-            {
-                buffer.Advance(8);
-                this.messageHeadersSerializer.Serialize(buffer, message.Headers);
-                var headerLength = buffer.CommitedByteCount;
-                this.objectSerializer.Serialize(buffer, message.BodyObject);
-                var bodyLength = buffer.CommitedByteCount - headerLength;
-
-                var data = buffer.ToArray();
-                var lengthPrefixes = MemoryMarshal.Cast<byte, int>(data);
-                lengthPrefixes[0] = headerLength;
-                lengthPrefixes[1] = bodyLength;
-
-                deserializedMessage = DeserializeMessage(buffer.CommitedByteCount, data);
-            }
-
+            var writer = new ArrayBufferWriter();
+            this.messageSerializer.Write(ref writer, message);
+            
+            var data = writer.ToArray();
+            var reader = new ReadOnlySequence<byte>(data);
+            Assert.Equal(0, this.messageSerializer.TryRead(ref reader, out var deserializedMessage));
             return deserializedMessage;
         }
 
@@ -133,26 +118,6 @@ namespace UnitTests.Serialization
                 Assert.IsAssignableFrom<string>(responseList[k]); //Body list item " + k + " has wrong type
                 Assert.Equal((string)(requestBody[k]), (string)(responseList[k])); //Body list item " + k + " is incorrect
             }
-        }
-
-        private Message DeserializeMessage(int length, byte[] data)
-        {
-            int headerLength = BitConverter.ToInt32(data, 0);
-            int bodyLength = BitConverter.ToInt32(data, 4);
-            Assert.Equal<int>(length, headerLength + bodyLength + 8); //Serialized lengths are incorrect
-            byte[] header = new byte[headerLength];
-            Array.Copy(data, 8, header, 0, headerLength);
-            byte[] body = new byte[bodyLength];
-            Array.Copy(data, 8 + headerLength, body, 0, bodyLength);
-
-            this.messageHeadersSerializer.Deserialize(new ReadOnlySequence<byte>(header), out var headersContainer);
-            this.objectSerializer.Deserialize(new ReadOnlySequence<byte>(body), out var bodyObject);
-            
-            return new Message
-            {
-                Headers = headersContainer,
-                BodyObject = bodyObject
-            };
         }
     }
 }

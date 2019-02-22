@@ -26,39 +26,6 @@ using System.Buffers;
 
 namespace Orleans.Serialization
 {
-    public sealed class OrleansSerializer<T> : ISerializer<T>
-    {
-        private readonly SerializationManager serializationManager;
-        private readonly BinaryTokenStreamReader2 reader = new BinaryTokenStreamReader2();
-        private object writerCache;
-
-        public OrleansSerializer(SerializationManager serializationManager)
-        {
-            this.serializationManager = serializationManager;
-        }
-
-        public void Deserialize(ReadOnlySequence<byte> input, out T value)
-        {
-            reader.Reset(ref input);
-            value = this.serializationManager.Deserialize<T>(reader);
-        }
-
-        public void Serialize<TBufferWriter>(TBufferWriter output, T value) where TBufferWriter : IBufferWriter<byte>
-        {
-            if (writerCache is BinaryTokenStreamWriter2<TBufferWriter> writer)
-            {
-                writer.Reset(output);
-            }
-            else
-            {
-                writerCache = writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
-            }
-
-            this.serializationManager.Serialize(value, writer);
-            writer.Commit();
-        }
-    }
-
     /// <summary>
     /// SerializationManager to oversee the Orleans serializer system.
     /// </summary>
@@ -100,9 +67,6 @@ namespace Orleans.Serialization
         
         internal int LargeObjectSizeThreshold { get; }
 
-        private readonly ThreadLocal<SerializationContext> serializationContext;
-        
-        private readonly ThreadLocal<DeserializationContext> deserializationContext;
         private readonly IServiceProvider serviceProvider;
         private readonly ITypeResolver typeResolver;
         private readonly SerializationStatisticsGroup serializationStatistics;
@@ -122,8 +86,6 @@ namespace Orleans.Serialization
             int largeMessageWarningThreshold)
         {
             this.LargeObjectSizeThreshold = largeMessageWarningThreshold;
-            this.serializationContext = new ThreadLocal<SerializationContext>(() => new SerializationContext(this));
-            this.deserializationContext = new ThreadLocal<DeserializationContext>(() => new DeserializationContext(this));
 
             logger = loggerFactory.CreateLogger<SerializationManager>();
             this.serviceProvider = serviceProvider;
@@ -611,8 +573,7 @@ namespace Orleans.Serialization
         /// <returns>Deep copied clone of the original input object.</returns>
         public object DeepCopy(object original)
         {
-            var context = this.serializationContext.Value;
-            context.Reset();
+            var context = new SerializationContext(this);
             
             Stopwatch timer = null;
             if (this.serializationStatistics.CollectSerializationStats)
@@ -623,7 +584,6 @@ namespace Orleans.Serialization
             }
 
             object copy = DeepCopyInner(original, context);
-            context.Reset();
 
 
             if (timer != null)
@@ -637,8 +597,7 @@ namespace Orleans.Serialization
 
         internal void DeepCopyElementsInPlace(object[] args)
         {
-            var context = this.serializationContext.Value;
-            context.Reset();
+            var context = new SerializationContext(this);
 
             Stopwatch timer = null;
             if (this.serializationStatistics.CollectSerializationStats)
@@ -649,10 +608,7 @@ namespace Orleans.Serialization
             }
 
             for (var i = 0; i < args.Length; i++) args[i] = DeepCopyInner(args[i], context);
-
-            context.Reset();
-
-
+            
             if (timer != null)
             {
                 timer.Stop();
@@ -853,11 +809,9 @@ namespace Orleans.Serialization
                 serializationStatistics.Serializations.Increment();
             }
 
-            var context = this.serializationContext.Value;
-            context.Reset();
+            var context = new SerializationContext(this);
             context.StreamWriter = stream;
             SerializeInner(raw, context, null);
-            context.Reset();
 
             if (timer != null)
             {
@@ -1169,11 +1123,9 @@ namespace Orleans.Serialization
             byte[] result;
             try
             {
-                var context = this.serializationContext.Value;
-                context.Reset();
+                var context = new SerializationContext(this);
                 context.StreamWriter = stream;
                 SerializeInner(raw, context, null);
-                context.Reset();
                 result = stream.ToByteArray();
             }
             finally
@@ -1212,8 +1164,7 @@ namespace Orleans.Serialization
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
         public object Deserialize(Type t, IBinaryTokenStreamReader stream)
         {
-            var context = this.deserializationContext.Value;
-            context.Reset();
+            var context = new DeserializationContext(this);
             context.StreamReader = stream;
             Stopwatch timer = null;
             if (this.serializationStatistics.CollectSerializationStats)
@@ -1225,7 +1176,6 @@ namespace Orleans.Serialization
             object result = null;
 
             result = DeserializeInner(t, context);
-            context.Reset();
 
             if (timer != null)
             {
@@ -1527,11 +1477,9 @@ namespace Orleans.Serialization
         /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
         public T DeserializeFromByteArray<T>(byte[] data)
         {
-            var context = this.deserializationContext.Value;
-            context.Reset();
+            var context = new DeserializationContext(this);
             context.StreamReader = new BinaryTokenStreamReader(data);
             var result = DeserializeInner<T>(context);
-            context.Reset();
             return result;
         }
 
@@ -1864,10 +1812,6 @@ namespace Orleans.Serialization
 
         public void Dispose()
         {
-            IDisposable disposable = this.serializationContext;
-            if (disposable != null) disposable.Dispose();
-            disposable = this.deserializationContext;
-            if (disposable != null) disposable.Dispose();
         }
     }
 }
