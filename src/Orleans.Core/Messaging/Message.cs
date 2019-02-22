@@ -997,6 +997,7 @@ namespace Orleans.Runtime
             public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
             {
                 HeadersContainer input = (HeadersContainer)untypedInput;
+                var sm = context.GetSerializationManager();
                 var headers = input.GetHeadersMask();
                 var writer = context.StreamWriter;
                 writer.Write((int)headers);
@@ -1006,7 +1007,7 @@ namespace Orleans.Runtime
                     writer.Write(input.CacheInvalidationHeader.Count);
                     for (int i = 0; i < count; i++)
                     {
-                        WriteObj(context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
+                        WriteObj(sm, context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
                     }
                 }
 
@@ -1105,7 +1106,7 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
                 {
-                    WriteObj(context, typeof(GuidId), input.TargetObserverId);
+                    WriteObj(sm, context, typeof(GuidId), input.TargetObserverId);
                 }
 
                 if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
@@ -1125,6 +1126,7 @@ namespace Orleans.Runtime
             [DeserializerMethod]
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
+                var sm = context.GetSerializationManager();
                 var result = new HeadersContainer();
                 var reader = context.StreamReader;
                 context.RecordObject(result);
@@ -1138,7 +1140,7 @@ namespace Orleans.Runtime
                        var list = result.CacheInvalidationHeader = new List<ActivationAddress>(n);
                         for (int i = 0; i < n; i++)
                         {
-                            list.Add((ActivationAddress)ReadObj(typeof(ActivationAddress), context));
+                            list.Add((ActivationAddress)ReadObj(sm, typeof(ActivationAddress), context));
                         }
                     }
                 }
@@ -1162,7 +1164,7 @@ namespace Orleans.Runtime
                     result.GenericGrainType = reader.ReadString();
 
                 if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
-                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(typeof(Orleans.Runtime.CorrelationId), context);
+                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(sm, typeof(CorrelationId), context);
 
                 if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
                     result.IsAlwaysInterleave = ReadBool(reader);
@@ -1224,7 +1226,7 @@ namespace Orleans.Runtime
                     result.TargetGrain = reader.ReadGrainId();
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                    result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), context);
+                    result.TargetObserverId = (GuidId)ReadObj(sm, typeof(GuidId), context);
 
                 if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
                     result.CallChainId = reader.ReadCorrelationId();
@@ -1245,15 +1247,15 @@ namespace Orleans.Runtime
                 return stream.ReadByte() == (byte) SerializationTokenType.True;
             }
 
-            private static void WriteObj(ISerializationContext context, Type type, object input)
+            private static void WriteObj(SerializationManager sm, ISerializationContext context, Type type, object input)
             {
-                var ser = context.GetSerializationManager().GetSerializer(type);
+                var ser = sm.GetSerializer(type);
                 ser.Invoke(input, context, type);
             }
 
-            private static object ReadObj(Type t, IDeserializationContext context)
+            private static object ReadObj(SerializationManager sm, Type t, IDeserializationContext context)
             {
-                var des = context.GetSerializationManager().GetDeserializer(t);
+                var des = sm.GetDeserializer(t);
                 return des.Invoke(t, context);
             }
         }

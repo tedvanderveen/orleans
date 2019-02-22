@@ -33,7 +33,7 @@ namespace Orleans.Serialization
     /// record the mapping of original object to the copied instance of that object
     /// so that object identity can be preserved when serializing .NET object graphs.
     /// </remarks>
-    public class SerializationContext : SerializationContextBase, ICopyContext, ISerializationContext
+    public sealed class SerializationContext : SerializationContextBase, ICopyContext, ISerializationContext
     {
         private struct Record
         {

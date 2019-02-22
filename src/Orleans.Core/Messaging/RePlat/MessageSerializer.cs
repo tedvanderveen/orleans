@@ -87,32 +87,53 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly SerializationManager serializationManager;
             private readonly BinaryTokenStreamReader2 reader = new BinaryTokenStreamReader2();
-            private object writerCache;
+            private readonly SerializationContext serializationContext;
+            private readonly DeserializationContext deserializationContext;
 
             public OrleansSerializer(SerializationManager serializationManager)
             {
                 this.serializationManager = serializationManager;
+                this.serializationContext = new SerializationContext(serializationManager);
+                this.deserializationContext = new DeserializationContext(serializationManager)
+                {
+                    StreamReader = this.reader
+                };
             }
 
             public void Deserialize(ref ReadOnlySequence<byte> input, out T value)
             {
-                reader.Reset(ref input);
-                value = this.serializationManager.Deserialize<T>(reader);
+                reader.PartialReset(ref input);
+                try
+                {
+                    value = (T)SerializationManager.DeserializeInner(this.serializationManager, typeof(T), this.deserializationContext, this.reader);
+                }
+                finally
+                {
+                    this.deserializationContext.Reset();
+                }
             }
 
             public void Serialize<TBufferWriter>(ref TBufferWriter output, T value) where TBufferWriter : IBufferWriter<byte>
             {
-                if (writerCache is BinaryTokenStreamWriter2<TBufferWriter> writer)
+                var streamWriter = this.serializationContext.StreamWriter;
+                if (streamWriter is BinaryTokenStreamWriter2<TBufferWriter> writer)
                 {
-                    writer.Reset(output);
+                    writer.PartialReset(output);
                 }
                 else
                 {
-                    writerCache = writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
+                    this.serializationContext.StreamWriter = writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
                 }
 
-                this.serializationManager.Serialize(value, writer);
-                writer.Commit();
+                try
+                {
+                    SerializationManager.SerializeInner(this.serializationManager, value, typeof(T), this.serializationContext, writer);
+                    writer.Commit();
+                }
+                finally
+                {
+                    this.serializationContext.Reset();
+                }
             }
         }
     }

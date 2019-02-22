@@ -425,11 +425,34 @@ namespace Orleans.Serialization
                     return typeof(bool[]);
                 case SerializationTokenType.SByteArray:
                     return typeof(sbyte[]);
+#if SERIALIZER_SESSIONAWARE
+                case SerializationTokenType.ReferencedType:
+                    {
+                        if (@this is BinaryTokenStreamReader2 knownReader)
+                        {
+                            var id = knownReader.ReadUInt();
+                            return knownReader.GetReferencedType(id);
+                        }
+                        else
+                        {
+                            ThrowInvalid();
+                            void ThrowInvalid() => throw new InvalidOperationException($"Context does not support referenced types, but a type reference was encountered.");
+                        }
+                        break;
+                    }
+#endif
                 case SerializationTokenType.NamedType:
                     var typeName = @this.ReadString();
                     try
                     {
-                        return serializationManager.ResolveTypeName(typeName);
+                        var type = serializationManager.ResolveTypeName(typeName);
+#if SERIALIZER_SESSIONAWARE
+                        if (@this is BinaryTokenStreamReader2 knownReader)
+                        {
+                            knownReader.RecordType(type);
+                        }
+#endif
+                        return type;
                     }
                     catch (TypeAccessException ex)
                     {

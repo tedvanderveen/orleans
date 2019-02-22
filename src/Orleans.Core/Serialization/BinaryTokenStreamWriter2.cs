@@ -15,157 +15,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    public static class ReadOnlySequenceHelper
-    {
-        public static ReadOnlySequence<byte> ToReadOnlySequence(this IEnumerable<Memory<byte>> buffers)
-        {
-            return ReadOnlyBufferSegment.Create(buffers);
-        }
-
-        public static ReadOnlySequence<byte> CreateReadOnlySequence(params byte[][] buffers)
-        {
-            if (buffers.Length == 1)
-            {
-                return new ReadOnlySequence<byte>(buffers[0]);
-            }
-
-            var list = new List<Memory<byte>>();
-            foreach (var buffer in buffers)
-            {
-                list.Add(buffer);
-            }
-
-            return ToReadOnlySequence(list.ToArray());
-        }
-
-        public static ReadOnlySequence<byte> CreateReadOnlySequence(List<ArraySegment<byte>> buffers, int offset, int length)
-        {
-            return ReadOnlyBufferSegment.Create(buffers, offset, length);
-        }
-
-        public static ReadOnlySequence<byte> CreateReadOnlySequence(List<ArraySegment<byte>> buffers)
-        {
-            return ReadOnlyBufferSegment.Create(buffers);
-        }
-
-        private class ReadOnlyBufferSegment : ReadOnlySequenceSegment<byte>
-        {
-            public static ReadOnlySequence<byte> Create(List<ArraySegment<byte>> buffers)
-            {
-                ReadOnlyBufferSegment segment = null;
-                ReadOnlyBufferSegment first = null;
-                foreach (var buffer in buffers)
-                {
-                    var newSegment = new ReadOnlyBufferSegment
-                    {
-                        Memory = buffer,
-                    };
-
-                    if (segment != null)
-                    {
-                        segment.Next = newSegment;
-                        newSegment.RunningIndex = segment.RunningIndex + segment.Memory.Length;
-                    }
-                    else
-                    {
-                        first = newSegment;
-                    }
-
-                    segment = newSegment;
-                }
-
-                if (first == null)
-                {
-                    first = segment = new ReadOnlyBufferSegment();
-                }
-
-                return new ReadOnlySequence<byte>(first, 0, segment, segment.Memory.Length);
-            }
-
-            public static ReadOnlySequence<byte> Create(IEnumerable<Memory<byte>> buffers)
-            {
-                ReadOnlyBufferSegment segment = null;
-                ReadOnlyBufferSegment first = null;
-                foreach (var buffer in buffers)
-                {
-                    var newSegment = new ReadOnlyBufferSegment
-                    {
-                        Memory = buffer,
-                    };
-
-                    if (segment != null)
-                    {
-                        segment.Next = newSegment;
-                        newSegment.RunningIndex = segment.RunningIndex + segment.Memory.Length;
-                    }
-                    else
-                    {
-                        first = newSegment;
-                    }
-
-                    segment = newSegment;
-                }
-
-                if (first == null)
-                {
-                    first = segment = new ReadOnlyBufferSegment();
-                }
-
-                return new ReadOnlySequence<byte>(first, 0, segment, segment.Memory.Length);
-            }
-
-            public static ReadOnlySequence<byte> Create(List<ArraySegment<byte>> buffers, int offset, int length)
-            {
-                ReadOnlyBufferSegment segment = null;
-                ReadOnlyBufferSegment first = null;
-                var lengthSoFar = 0;
-                var countSoFar = 0;
-                foreach (var buffer in buffers)
-                {
-                    var bytesStillToSkip = Math.Max(0, offset - lengthSoFar);
-                    lengthSoFar += buffer.Count;
-
-                    if (buffer.Count <= bytesStillToSkip) // Still skipping past this buffer
-                    {
-                        continue;
-                    }
-                    
-                    var segmentLength = Math.Min(length - countSoFar, buffer.Count - bytesStillToSkip);
-                    var newSegment = new ReadOnlyBufferSegment
-                    {
-                        Memory = new Memory<byte>(buffer.Array, buffer.Offset + bytesStillToSkip, segmentLength)
-                    };
-
-                    countSoFar += segmentLength;
-
-                    if (segment != null)
-                    {
-                        segment.Next = newSegment;
-                        newSegment.RunningIndex = segment.RunningIndex + segmentLength;
-                    }
-                    else
-                    {
-                        first = newSegment;
-                    }
-
-                    segment = newSegment;
-
-                    if (countSoFar == length)
-                    {
-                        break;
-                    }
-                }
-
-                if (first == null)
-                {
-                    first = segment = new ReadOnlyBufferSegment();
-                }
-
-                return new ReadOnlySequence<byte>(first, 0, segment, segment.Memory.Length);
-            }
-        }
-    }
-
     internal class ArrayBufferWriter : IBufferWriter<byte>, IDisposable
     { 
         private ResizableArray<byte> buffer;
@@ -286,6 +135,9 @@ namespace Orleans.Serialization
         private static readonly Dictionary<Type, SerializationTokenType> typeTokens;
         private static readonly Dictionary<Type, Action<BinaryTokenStreamWriter2<TBufferWriter>, object>> writers;
 
+#if SERIALIZER_SESSIONAWARE
+        private ReferencedTypeCollection referencedTypes;
+#endif
         private TBufferWriter output;
         private Memory<byte> currentBuffer;
         private int currentOffset;
@@ -368,10 +220,10 @@ namespace Orleans.Serialization
         
         public BinaryTokenStreamWriter2(TBufferWriter output)
         {
-            this.Reset(output);
+            this.PartialReset(output);
         }
 
-        public void Reset(TBufferWriter output)
+        public void PartialReset(TBufferWriter output)
         {
             this.output = output;
             this.currentBuffer = output.GetMemory();
@@ -427,7 +279,22 @@ namespace Orleans.Serialization
         {
             this.Write((byte)SerializationTokenType.Null);
         }
-        
+
+#if SERIALIZER_SESSIONAWARE
+        private uint CheckTypeWhileSerializing(Type type)
+        {
+            if (this.referencedTypes == null) return 0;
+            this.referencedTypes.TryGetReference(type, out var result);
+            return result;
+        }
+
+        private void RecordType(Type type)
+        {
+            var types = this.referencedTypes ?? (this.referencedTypes = new ReferencedTypeCollection());
+            types.RecordTypeWhileSerializing(type);
+        }
+#endif
+
         public void WriteTypeHeader(Type t, Type expected = null)
         {
             if (t == expected)
@@ -451,7 +318,15 @@ namespace Orleans.Serialization
                 this.Write((byte)token);
                 return;
             }
-
+#if SERIALIZER_SESSIONAWARE
+            var id = this.CheckTypeWhileSerializing(t);
+            if (id > 0)
+            {
+                this.Write((byte)SerializationTokenType.ReferencedType);
+                this.Write(id);
+                return;
+            }
+#endif
             if (t.GetTypeInfo().IsGenericType)
             {
                 if (typeTokens.TryGetValue(t.GetGenericTypeDefinition(), out token))
@@ -465,6 +340,9 @@ namespace Orleans.Serialization
                 }
             }
 
+#if SERIALIZER_SESSIONAWARE
+            this.RecordType(t);
+#endif
             this.Write((byte)SerializationTokenType.NamedType);
             var typeKey = t.OrleansTypeKey();
             this.Write(typeKey.Length);

@@ -1,16 +1,10 @@
 //#define TRACE_SERIALIZATION
+//#define SERIALIZER_SESSIONAWARE
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Buffers.Text;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
 using System.Text;
 using Orleans.Runtime;
 
@@ -35,7 +29,24 @@ namespace Orleans.Serialization
         {
         }
 
-        public void Reset(ref ReadOnlySequence<byte> input)
+#if SERIALIZER_SESSIONAWARE
+        private ReferencedTypeCollection referencedTypes;
+        internal void RecordType(Type type)
+        {
+            var types = this.referencedTypes ?? (this.referencedTypes = new ReferencedTypeCollection());
+            types.RecordTypeWhileDeserializing(type);
+        }
+
+        internal Type GetReferencedType(uint id)
+        {
+            if (this.referencedTypes == null || !this.referencedTypes.TryGetReferencedType(id, out var result)) return ThrowNull(id);
+            return result;
+
+            Type ThrowNull(uint i) => throw new InvalidOperationException($"No referenced types for id {i}");
+        }
+#endif
+
+        public void PartialReset(ref ReadOnlySequence<byte> input)
         {
             this.input = input;
             this.nextSequencePosition = input.Start;
@@ -80,7 +91,7 @@ namespace Orleans.Serialization
         {
             var result = new BinaryTokenStreamReader2();
             var sliced = this.input.Slice(position);
-            result.Reset(ref sliced);
+            result.PartialReset(ref sliced);
             return result;
         }   
 
@@ -455,7 +466,7 @@ namespace Orleans.Serialization
         public IBinaryTokenStreamReader Copy()
         {
             var result = new BinaryTokenStreamReader2();
-            result.Reset(ref this.input);
+            result.PartialReset(ref this.input);
             return result;
         }
 

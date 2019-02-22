@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Messaging
                 while (!this.cancellation.IsCancellationRequested)
                 {
                     var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask.ConfigureAwait(false);
+                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask;
                     if (!more)
                     {
                         break;
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     var flushTask = output.FlushAsync();
-                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask.ConfigureAwait(false);
+                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask;
                     if (flushResult.IsCompleted || flushResult.IsCanceled) break;
                 }
             }

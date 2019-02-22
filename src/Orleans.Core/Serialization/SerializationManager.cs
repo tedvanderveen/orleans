@@ -838,7 +838,17 @@ namespace Orleans.Serialization
         {
             var sm = context.GetSerializationManager();
             var writer = context.StreamWriter;
+            SerializeInner(sm, obj, expected, context, writer);
+        }
 
+        /// <summary>
+        /// Encodes the object to the provided binary token stream.
+        /// </summary>
+        [SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
+        internal static void SerializeInner<TObject, TContext, TWriter>(SerializationManager sm, TObject obj, Type expected, TContext context, TWriter writer)
+            where TContext : ISerializationContext
+            where TWriter : IBinaryTokenStreamWriter
+        {
             // Nulls get special handling
             if (obj == null)
             {
@@ -885,10 +895,10 @@ namespace Orleans.Serialization
             }
 
             // Arrays get handled specially
-            if (t.IsArray)
+            if (obj is Array array)
             {
                 var et = t.GetElementType();
-                SerializeArray((Array)obj, context, expected, et);
+                SerializeArray(array, context, expected, et);
                 return;
             }
 
@@ -1205,8 +1215,19 @@ namespace Orleans.Serialization
         public static object DeserializeInner(Type expected, IDeserializationContext context)
         {
             var sm = context.GetSerializationManager();
-            var previousOffset = context.CurrentObjectOffset;
             var reader = context.StreamReader;
+            return DeserializeInner(sm, expected, context, reader);
+        }
+
+        /// <summary>
+        /// Deserialize the next object from the input binary stream.
+        /// </summary>
+        /// <returns>Object of the required Type, rehydrated from the input stream.</returns>
+        internal static object DeserializeInner<TContext, TReader>(SerializationManager sm, Type expected, TContext context, TReader reader)
+            where TContext : IDeserializationContext
+            where TReader : IBinaryTokenStreamReader
+        {
+            var previousOffset = context.CurrentObjectOffset;
             context.CurrentObjectOffset = context.CurrentPosition;
 
             try

@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Messaging
                 while (!this.cancellation.IsCancellationRequested)
                 {
                     var readResultTask = input.ReadAsync(this.cancellation.Token);
-                    var readResult = readResultTask.IsCompletedSuccessfully ? readResultTask.GetAwaiter().GetResult() : await readResultTask.ConfigureAwait(false);
+                    var readResult = readResultTask.IsCompletedSuccessfully ? readResultTask.GetAwaiter().GetResult() : await readResultTask;
                     
                     var buffer = readResult.Buffer;
                     
