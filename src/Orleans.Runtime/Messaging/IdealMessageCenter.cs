@@ -1,10 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -19,16 +24,58 @@ namespace Orleans.Runtime.Messaging
         internal void OnInboundPing(Message message) { }
     }
 
-    internal sealed class IdealMessageCenter : IMessageHandler
+    internal sealed class IdealMessageCenter : IMessageHandler, ILifecycleParticipant<ISiloLifecycle>
     {
+        private readonly OrleansTaskScheduler scheduler;
         private readonly ILocalGrainDirectory localDirectory;
+        private readonly ActivationDirectory activationDirectory;
         private readonly ILogger<IdealMessageCenter> logger;
         private readonly SiloAddress localSiloAddress;
         private readonly MessageTrace trace;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly MessageFactory messageFactory;
+        private readonly Dispatcher dispatcher;
+        private readonly Gateway gateway;
+        private readonly ConnectionManager connectionManager;
+        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly IHostedClient hostedClient;
+
         private bool isBlockingApplicationMessages;
 
+        public IdealMessageCenter(
+            OrleansTaskScheduler scheduler,
+            ILocalGrainDirectory localDirectory,
+            ActivationDirectory activationDirectory,
+            ILogger<IdealMessageCenter> logger,
+            ILocalSiloDetails localSiloDetails,
+            MessageTrace messageTrace,
+            IOptions<SiloMessagingOptions> siloMessagingOptions,
+            MessageFactory messageFactory,
+            Dispatcher dispatcher,
+            Gateway gateway,
+            ConnectionManager connectionManager,
+            ISiloStatusOracle siloStatusOracle,
+            IEnumerable<HostedClient> hostedClient)
+        {
+            this.localSiloAddress = localSiloDetails.SiloAddress;
+            this.hostedClient = hostedClient.FirstOrDefault();
+            this.scheduler = scheduler;
+            this.localDirectory = localDirectory;
+            this.activationDirectory = activationDirectory;
+            this.logger = logger;
+            this.trace = messageTrace;
+            this.messageFactory = messageFactory;
+            this.dispatcher = dispatcher;
+            this.gateway = gateway;
+            this.connectionManager = connectionManager;
+            this.siloStatusOracle = siloStatusOracle;
+            this.messagingOptions = siloMessagingOptions.Value;
+        }
+
+        /// <summary>
+        /// Handles all incoming and outgoing messages.
+        /// </summary>
+        /// <param name="message"></param>
         public void HandleMessage(Message message)
         {
             Debug.Assert(message != null);
@@ -44,11 +91,11 @@ namespace Orleans.Runtime.Messaging
             // If destination silo is not specified, reject
             if (message.TargetSilo == null)
             {
-                this.RejectMessage(message, "No target silo provided.");
+                this.SendRejectionMessage(message, "No target silo provided.");
                 return;
             }
 
-            // If message is destined for remote silo:
+            // If message is destined for remote silo, send it onwards.
             if (!message.TargetSilo.Matches(this.localSiloAddress))
             {
                 if (message.SendingSilo.Matches(this.localSiloAddress))
@@ -97,30 +144,15 @@ namespace Orleans.Runtime.Messaging
                     return;
                 case Message.Categories.Application:
                 case Message.Categories.System:
-
+                    this.HandleInboundMessage(message);
                     return;
                 default:
                     Debug.Assert(false, "Unknown message category: " + message.Category);
                     return;
             }
-
-            // Switch on message.Category:
-            //   * If Ping:
-            //     * Send ping response
-            //   * If System or Application:
-            //     * If recipient is SystemTarget:
-            //       * Find SystemTarget in Catalog
-            //       * Enqueue message against system target
-            //     * If recipient is Grain:
-            //       * Find activation in catalog
-            //       * If activation not found
-            //       * If activation is not valid, reject with NonExistentActivationException
-            //     * If recipient is Client:
-            //       * If recipient is HostedClient, forward to hosted client
-            //       * Otherwise, find client in gateway cache
-            //       * Forward message to client
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private void HandleInboundPingMessage(Message message)
         {
             this.trace.OnInboundPing(message);
@@ -129,8 +161,150 @@ namespace Orleans.Runtime.Messaging
             this.SendMessageToRemoteSilo(response);
         }
 
-        private void OnUnknownMessageCategory(Message message)
+        private void HandleInboundMessage(Message message)
         {
+            switch (message.TargetGrain.Category)
+            {
+                case UniqueKey.Category.Client:
+                case UniqueKey.Category.GeoClient:
+                    this.HandleInboundMessageToClient(message);
+                    return;
+                case UniqueKey.Category.Grain:
+                case UniqueKey.Category.KeyExtGrain:
+                    this.HandleInboundMessageToGrain(message);
+                    return;
+                case UniqueKey.Category.SystemTarget:
+                    this.HandleInboundMessageToSystemTarget(message);
+                    return;
+                case UniqueKey.Category.SystemGrain:
+                default:
+                    this.HandleInboundMessageToUnknownTarget(message);
+                    return;
+            }
+        }
+
+        private void HandleInboundMessageToUnknownTarget(Message message)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void HandleInboundMessageToSystemTarget(Message message)
+        {
+            var target = this.activationDirectory.FindSystemTarget(message.TargetActivation);
+            if (target == null)
+            {
+                this.RejectMessageToUnknownSystemTarget(message);
+                return;
+            }
+
+            var context = target.SchedulingContext;
+            switch (message.Direction)
+            {
+                case Message.Directions.Request:
+                    MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+                    scheduler.QueueWorkItem(new RequestWorkItem(target, message), context);
+                    break;
+
+                case Message.Directions.Response:
+                    MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+                    scheduler.QueueWorkItem(new ResponseWorkItem(target, message), context);
+                    break;
+
+                default:
+                    this.logger.Error(ErrorCode.Runtime_Error_100097, "Invalid message: " + message);
+                    break;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void RejectMessageToUnknownSystemTarget(Message message)
+        {
+            MessagingStatisticsGroup.OnRejectedMessage(message);
+            Message response = this.messageFactory.CreateRejectionResponse(message, Message.RejectionTypes.Unrecoverable,
+                string.Format("SystemTarget {0} not active on this silo. Msg={1}", message.TargetGrain, message));
+            this.HandleMessage(response);
+            this.logger.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", message, message.TargetAddress);
+        }
+
+        private void HandleInboundMessageToClient(Message message)
+        {
+            if (!this.gateway.TryDeliverToProxy(message) && hostedClient == null || !hostedClient.TryDispatchToClient(message))
+            {
+                this.DropMessageToUnknownClient(message);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void DropMessageToUnknownClient(Message message)
+        {
+            this.trace.OnDropMessage(message, $"Client {message.TargetGrain} is unknown.");
+        }
+
+        private void HandleInboundMessageToGrain(Message message)
+        {
+            // Run this code on the target activation's context, if it already exists
+            var target = this.activationDirectory.FindTarget(message.TargetActivation);
+            if (target != null)
+            {
+                ISchedulingContext context;
+                if (target.State == ActivationState.Valid)
+                {
+                    // Response messages are not subject to overload checks.
+                    if (message.Direction != Message.Directions.Response)
+                    {
+                        var overloadException = target.CheckOverloaded(this.logger);
+                        if (overloadException != null)
+                        {
+                            // Send rejection as soon as we can, to avoid creating additional work for runtime
+                            this.RejectMessageToOverloadedActivation(message, target, overloadException);
+                            return;
+                        }
+                    }
+
+                    // Run ReceiveMessage in context of target activation
+                    context = target.SchedulingContext;
+                }
+                else
+                {
+                    // Can't use this activation - will queue for another activation
+                    target = null;
+                    context = null;
+                }
+
+                EnqueueReceiveMessage(message, target, context);
+            }
+            else
+            {
+                // No usable target activation currently, so run ReceiveMessage in system context
+                EnqueueReceiveMessage(message, null, null);
+            }
+
+            void EnqueueReceiveMessage(Message msg, ActivationData activation, ISchedulingContext ctx)
+            {
+                MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(ctx);
+
+                if (activation != null) activation.IncrementEnqueuedOnDispatcherCount();
+
+                scheduler.QueueWorkItem(new ClosureWorkItem(() =>
+                {
+                    try
+                    {
+                        this.dispatcher.ReceiveMessage(msg);
+                    }
+                    finally
+                    {
+                        if (activation != null) activation.DecrementEnqueuedOnDispatcherCount();
+                    }
+                },
+                "ReceiveMessage"), ctx);
+            }
+        }
+
+        private void RejectMessageToOverloadedActivation(Message message, ActivationData target, LimitExceededException overloadException)
+        {
+            var reason = "Target activation is overloaded " + target;
+            var rejection = this.messageFactory.CreateRejectionResponse(message, Message.RejectionTypes.Overloaded, reason, overloadException);
+            this.SendRejectionMessage(rejection, reason);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -171,7 +345,7 @@ namespace Orleans.Runtime.Messaging
             // Invalidate the remote caller's activation cache entry.
             if (message.TargetAddress != null) rejection.AddToCacheInvalidationHeader(message.TargetAddress);
 
-            this.RejectMessage(message, reason);
+            this.SendRejectionMessage(message, reason);
         }
 
         private void DropMessage(Message message, string reason)
@@ -180,7 +354,7 @@ namespace Orleans.Runtime.Messaging
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private void RejectMessage(Message message, string reason)
+        private void SendRejectionMessage(Message message, string reason)
         {
             Debug.Assert(message.Result == Message.ResponseTypes.Rejection);
             this.trace.OnRejectMessage(message, reason);
@@ -209,10 +383,45 @@ namespace Orleans.Runtime.Messaging
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void SendMessageToRemoteSilo(Message message)
         {
-            //   * If remote silo is known to be dead (according to silo oracle), reject
-            //   * Get handler for remote silo
-            //   * If not found, reject
-            //   * Forward to remote silo handler
+            // If remote silo is known to be dead (according to silo oracle), reject
+            var targetSilo = message.TargetSilo;
+            if (this.siloStatusOracle.IsDeadSilo(targetSilo))
+            {
+                this.RejectMessageToKnownDeadSilo(message);
+                return;
+            }
+
+            var sender = this.connectionManager.GetConnection(targetSilo.Endpoint.ToString());
+            sender.Send(message);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void RejectMessageToKnownDeadSilo(Message message)
+        {
+            var reason = string.Format("Target {0} silo is known to be dead", message.TargetSilo.ToLongString());
+            var rejection = this.messageFactory.CreateRejectionResponse(message, Message.RejectionTypes.Transient, reason);
+            this.SendRejectionMessage(rejection, reason);
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe(
+                "MessageCenter",
+                ServiceLifecycleStage.RuntimeInitialize,
+                OnRuntimeInitializeStart,
+                OnRuntimeInitializeStop);
+
+            Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
+            {
+                this.isBlockingApplicationMessages = false;
+                return Task.CompletedTask;
+            }
+
+            Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
+            {
+                this.isBlockingApplicationMessages = true;
+                return Task.CompletedTask;
+            }
         }
     }
 }
