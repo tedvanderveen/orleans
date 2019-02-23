@@ -579,7 +579,7 @@ namespace Orleans.Runtime
         /// <param name="message"></param>
         internal void RerouteMessage(Message message)
         {
-            ResendMessageImpl(message);
+            ResendMessageImpl(message, forwardingAddress: null);
         }
 
         internal bool TryResendMessage(Message message)
@@ -588,7 +588,7 @@ namespace Orleans.Runtime
 
             message.ResendCount = message.ResendCount + 1;
             MessagingProcessingStatisticsGroup.OnIgcMessageResend(message);
-            ResendMessageImpl(message);
+            ResendMessageImpl(message, forwardingAddress: null);
             return true;
         }
 
@@ -602,7 +602,7 @@ namespace Orleans.Runtime
             return true;
         }
 
-        private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
+        private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resend {0}", message);
             //message.TargetHistory = message.GetTargetHistory();
@@ -632,8 +632,7 @@ namespace Orleans.Runtime
         {
             return message.ForwardCount < messagingOptions.MaxForwardCount
                 // allow one more forward hop for multi-cluster case
-                + (message.IsReturnedFromRemoteCluster ? 1 : 0)
-                ;
+                + (message.IsReturnedFromRemoteCluster ? 1 : 0);
         }
 
         /// <summary>
@@ -752,7 +751,6 @@ namespace Orleans.Runtime
             SetMessageTargetPlacement(message, placementResult, targetAddress);
         }
 
-
         private void SetMessageTargetPlacement(Message message, PlacementResult placementResult, ActivationAddress targetAddress)
         {
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
@@ -858,20 +856,16 @@ namespace Orleans.Runtime
             // don't run any messages if activation is not ready or deactivating
             if (activation.State != ActivationState.Valid) return;
 
-            bool runLoop;
-            do
+            while (true)
             {
-                runLoop = false;
                 var nextMessage = activation.PeekNextWaitingMessage();
-                if (nextMessage == null) continue;
-                if (!ActivationMayAcceptRequest(activation, nextMessage)) continue;
+                if (nextMessage == null) break;
+                if (!ActivationMayAcceptRequest(activation, nextMessage)) break;
                 
                 activation.DequeueNextWaitingMessage();
                 // we might be over-writing an already running read only request.
                 HandleIncomingRequest(nextMessage, activation);
-                runLoop = true;
             }
-            while (runLoop);
         }
     }
 }

@@ -7,51 +7,6 @@ using System.Threading.Channels;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal interface IMessageHandler
-    {
-        void HandleMessage(Message message);
-    }
-
-    internal sealed class IdealMessageCenter : IMessageHandler
-    {
-        public void HandleMessage(Message message)
-        {
-            // Preconditions:
-            //   * If expired, drop.
-            //   * If forward count > max forward count, drop.
-
-            // If message is destined for remote silo:
-            //   * If remote silo is known to be dead (according to silo oracle), reject
-            //   * Get handler for remote silo
-            //   * If not found, reject
-            //   * Forward to remote silo handler
-
-            // Otherwise, message is destined for local silo.
-            // If destined for an older generation of this silo, send rejection.
-            //    * If target activation is set, add to cache invalidation headers on rejection message.
-
-            // If messaging has CacheInvalidationHeaders, invalidate those entries.
-
-            // If IsBlockingApplicationMessages:
-            //   * If Category is Application and !Constants.SystemMembershipTableId.Equals(msg.SendingGrain), then drop
-
-            // Switch on message.Category:
-            //   * If Ping:
-            //     * Send ping response
-            //   * If System or Application:
-            //     * If recipient is SystemTarget:
-            //       * Find SystemTarget in Catalog
-            //       * Enqueue message against system target
-            //     * If recipient is Grain:
-            //       * Find ActivationAddress in catalog
-            //       * If activation is not valid, reject with NonExistentActivationException
-            //     * If recipient is Client:
-            //       * If recipient is HostedClient, forward to hosted client
-            //       * Otherwise, find client in gateway cache
-            //       * Forward message to client
-        }
-    }
-
     internal sealed class MessageCenter : ISiloMessageCenter, IDisposable
     {
         public Gateway Gateway { get; set; }
@@ -243,7 +198,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
             }
-            else if (!this.TrySendLocal(msg))
+            else
             {
                 if (msg.SendingSilo == null)
                     msg.SendingSilo = MyAddress;

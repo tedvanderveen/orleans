@@ -499,7 +499,7 @@ namespace Orleans.Runtime
             }
    
             SetupActivationInstance(result, grainType, genericArguments);
-            activatedPromise = InitActivation(result, grainType, genericArguments, requestContextData);
+            activatedPromise = InitActivation(result, requestContextData);
             return result;
         }
 
@@ -523,8 +523,7 @@ namespace Orleans.Runtime
             Completed
         }
 
-        private async Task InitActivation(ActivationData activation, string grainType, string genericArguments,
-            Dictionary<string, object> requestContextData)
+        private async Task InitActivation(ActivationData activation, Dictionary<string, object> requestContextData)
         {
             // We've created a dummy activation, which we'll eventually return, but in the meantime we'll queue up (or perform promptly)
             // the operations required to turn the "dummy" activation into a real activation
@@ -542,8 +541,6 @@ namespace Orleans.Runtime
                     RecoverFailedInitActivation(activation, initStage, registrationResult);
                     return;
                 }
-
-                initStage = ActivationInitializationStage.SetupState;
 
                 initStage = ActivationInitializationStage.InvokeActivate;
                 await InvokeActivate(activation, requestContextData);
