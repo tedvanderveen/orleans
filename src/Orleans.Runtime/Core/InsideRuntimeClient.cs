@@ -25,7 +25,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal class InsideRuntimeClient : ISiloRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class InsideRuntimeClient : ISiloRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
@@ -593,7 +593,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
-                    this.Dispatcher.Transport.SendMessage(message);
+                    this.Dispatcher.MessageCenter.SendMessage(message);
                     return;
                 }
 

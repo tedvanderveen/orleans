@@ -1,17 +1,13 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Messaging;
-using Orleans.Serialization;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using System.Threading.Channels;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class MessageCenter : ISiloMessageCenter, IDisposable
+    internal sealed class MessageCenter : ISiloMessageCenter, IDisposable
     {
         public Gateway Gateway { get; set; }
         private readonly ILogger log;
@@ -202,7 +198,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
             }
-            else
+            else if (!this.TrySendLocal(msg))
             {
                 if (msg.SendingSilo == null)
                     msg.SendingSilo = MyAddress;

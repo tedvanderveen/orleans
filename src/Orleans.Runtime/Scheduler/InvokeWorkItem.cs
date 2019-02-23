@@ -10,8 +10,9 @@ namespace Orleans.Runtime.Scheduler
         private readonly ActivationData activation;
         private readonly Message message;
         private readonly Dispatcher dispatcher;
+        private readonly InsideRuntimeClient runtimeClient;
 
-        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher, ILogger logger)
+        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher, InsideRuntimeClient runtimeClient, ILogger logger)
         {
             this.logger = logger;
             if (activation?.GrainInstance == null)
@@ -24,6 +25,7 @@ namespace Orleans.Runtime.Scheduler
             this.activation = activation;
             this.message = message;
             this.dispatcher = dispatcher;
+            this.runtimeClient = runtimeClient;
             this.SchedulingContext = activation.SchedulingContext;
             activation.IncrementInFlightCount();
         }
@@ -42,9 +44,8 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                var grain = activation.GrainInstance;
-                var runtimeClient = this.dispatcher.RuntimeClient;
-                Task task = runtimeClient.Invoke(grain, this.activation, this.message);
+                var grain = this.activation.GrainInstance;
+                Task task = this.runtimeClient.Invoke(grain, this.activation, this.message);
 
                 // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault
                 if (task.IsCompleted)

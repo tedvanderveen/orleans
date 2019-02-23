@@ -67,7 +67,6 @@ namespace Orleans.Runtime
             }
         }
 
-
         public GrainTypeManager GrainTypeManager { get; private set; }
 
         public SiloAddress LocalSilo { get; private set; }
@@ -92,7 +91,6 @@ namespace Orleans.Runtime
         private readonly GrainCreator grainCreator;
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
-        private readonly SerializationManager serializationManager;
         private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
@@ -105,10 +103,9 @@ namespace Orleans.Runtime
             ActivationDirectory activationDirectory,
             ActivationCollector activationCollector,
             GrainCreator grainCreator,
-            ISiloMessageCenter messageCenter,
+            MessageCenter messageCenter,
             PlacementDirectorsManager placementDirectorsManager,
             MessageFactory messageFactory,
-            SerializationManager serializationManager,
             IStreamProviderRuntime providerRuntime,
             IServiceProvider serviceProvider,
             CachedVersionSelectorManager versionSelectorManager,
@@ -128,7 +125,6 @@ namespace Orleans.Runtime
             this.collectionNumber = 0;
             this.destroyActivationsNumber = 0;
             this.grainCreator = grainCreator;
-            this.serializationManager = serializationManager;
             this.versionSelectorManager = versionSelectorManager;
             this.providerRuntime = providerRuntime;
             this.serviceProvider = serviceProvider;
@@ -145,7 +141,6 @@ namespace Orleans.Runtime
                 grainDirectory,
                 this.activationCollector,
                 messageFactory,
-                serializationManager,
                 versionSelectorManager.CompatibilityDirectorManager,
                 loggerFactory,
                 schedulingOptions);

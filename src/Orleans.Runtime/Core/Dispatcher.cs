@@ -18,7 +18,7 @@ namespace Orleans.Runtime
 {
     internal class Dispatcher
     {
-        internal ISiloMessageCenter Transport { get; }
+        internal MessageCenter MessageCenter { get; }
 
         private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
@@ -28,40 +28,37 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly ActivationCollector activationCollector;
         private readonly MessageFactory messageFactory;
-        private readonly SerializationManager serializationManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
+        private readonly InsideRuntimeClient runtimeClient;
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
-            ISiloMessageCenter transport, 
+            MessageCenter messageCenter, 
             Catalog catalog,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
             ActivationCollector activationCollector,
             MessageFactory messageFactory,
-            SerializationManager serializationManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory,
             IOptions<SchedulingOptions> schedulerOptions)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
-            Transport = transport;
+            this.MessageCenter = messageCenter;
+            this.runtimeClient = catalog.RuntimeClient;
             this.messagingOptions = messagingOptions.Value;
             this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
             this.activationCollector = activationCollector;
             this.messageFactory = messageFactory;
-            this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             this.schedulingOptions = schedulerOptions.Value;
             logger = loggerFactory.CreateLogger<Dispatcher>();
         }
-
-        public ISiloRuntimeClient RuntimeClient => this.catalog.RuntimeClient;
 
         /// <summary>
         /// Receive a new message:
@@ -223,7 +220,7 @@ namespace Orleans.Runtime
         {
             if (rejection.Result == Message.ResponseTypes.Rejection)
             {
-                Transport.SendMessage(rejection);
+                MessageCenter.SendMessage(rejection);
             }
             else
             {
@@ -244,7 +241,7 @@ namespace Orleans.Runtime
                     return;
                 }
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                if (Transport.TryDeliverToProxy(message)) return;
+                if (MessageCenter.TryDeliverToProxy(message)) return;
 
                this.catalog.RuntimeClient.ReceiveResponse(message);
             }
@@ -416,7 +413,7 @@ namespace Orleans.Runtime
                 targetActivation.RecordRunning(message, message.IsAlwaysInterleave);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
+                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.runtimeClient, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
             }
         }
 
@@ -618,7 +615,7 @@ namespace Orleans.Runtime
             {
                 message.TargetAddress = forwardingAddress;
                 message.IsNewPlacement = false;
-                this.Transport.SendMessage(message);
+                this.MessageCenter.SendMessage(message);
             }
             else
             {
@@ -795,7 +792,7 @@ namespace Orleans.Runtime
 
             if (message.TargetSilo == null)
             {
-                message.TargetSilo = Transport.MyAddress;
+                message.TargetSilo = MessageCenter.MyAddress;
             }
             if (message.TargetActivation == null)
             {
@@ -814,7 +811,7 @@ namespace Orleans.Runtime
         {
             MarkSameCallChainMessageAsInterleaving(sendingActivation, message);
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_Send_AddressedMessage, "Addressed message {0}", message);
-            Transport.SendMessage(message);
+            MessageCenter.SendMessage(message);
         }
 
         /// <summary>

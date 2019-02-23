@@ -24,10 +24,10 @@ namespace Orleans.Runtime
         GrainId ISystemTargetBase.GrainId => grainId;
         internal SchedulingContext SchedulingContext => schedulingContext;
         internal ActivationId ActivationId { get; set; }
-        private ISiloRuntimeClient runtimeClient;
+        private InsideRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger timerLogger;
-        internal ISiloRuntimeClient RuntimeClient
+        internal InsideRuntimeClient RuntimeClient
         {
             get
             {
