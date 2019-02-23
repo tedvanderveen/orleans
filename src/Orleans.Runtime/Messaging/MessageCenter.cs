@@ -21,12 +21,19 @@ namespace Orleans.Runtime.Messaging
             //   * If forward count > max forward count, drop.
 
             // If message is destined for remote silo:
+            //   * If remote silo is known to be dead (according to silo oracle), reject
             //   * Get handler for remote silo
-            //   * If not found, Reject(msg, reason)
+            //   * If not found, reject
+            //   * Forward to remote silo handler
 
             // Otherwise, message is destined for local silo.
             // If destined for an older generation of this silo, send rejection.
             //    * If target activation is set, add to cache invalidation headers on rejection message.
+
+            // If messaging has CacheInvalidationHeaders, invalidate those entries.
+
+            // If IsBlockingApplicationMessages:
+            //   * If Category is Application and !Constants.SystemMembershipTableId.Equals(msg.SendingGrain), then drop
 
             // Switch on message.Category:
             //   * If Ping:
@@ -38,6 +45,10 @@ namespace Orleans.Runtime.Messaging
             //     * If recipient is Grain:
             //       * Find ActivationAddress in catalog
             //       * If activation is not valid, reject with NonExistentActivationException
+            //     * If recipient is Client:
+            //       * If recipient is HostedClient, forward to hosted client
+            //       * Otherwise, find client in gateway cache
+            //       * Forward message to client
         }
     }
 
