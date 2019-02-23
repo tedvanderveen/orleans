@@ -7,6 +7,40 @@ using System.Threading.Channels;
 
 namespace Orleans.Runtime.Messaging
 {
+    internal interface IMessageHandler
+    {
+        void HandleMessage(Message message);
+    }
+
+    internal sealed class IdealMessageCenter : IMessageHandler
+    {
+        public void HandleMessage(Message message)
+        {
+            // Preconditions:
+            //   * If expired, drop.
+            //   * If forward count > max forward count, drop.
+
+            // If message is destined for remote silo:
+            //   * Get handler for remote silo
+            //   * If not found, Reject(msg, reason)
+
+            // Otherwise, message is destined for local silo.
+            // If destined for an older generation of this silo, send rejection.
+            //    * If target activation is set, add to cache invalidation headers on rejection message.
+
+            // Switch on message.Category:
+            //   * If Ping:
+            //     * Send ping response
+            //   * If System or Application:
+            //     * If recipient is SystemTarget:
+            //       * Find SystemTarget in Catalog
+            //       * Enqueue message against system target
+            //     * If recipient is Grain:
+            //       * Find ActivationAddress in catalog
+            //       * If activation is not valid, reject with NonExistentActivationException
+        }
+    }
+
     internal sealed class MessageCenter : ISiloMessageCenter, IDisposable
     {
         public Gateway Gateway { get; set; }
