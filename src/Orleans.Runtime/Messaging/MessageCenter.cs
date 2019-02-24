@@ -45,11 +45,12 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloMessagingOptions> messagingOptions,
             IOptions<NetworkingOptions> networkingOptions,
             MessageFactory messageFactory,
-            Factory<MessageCenter, Gateway> gatewayFactory,
             ILoggerFactory loggerFactory,
             IOptions<StatisticsOptions> statisticsOptions,
-            ConnectionManager senderManager)
+            ConnectionManager senderManager,
+            Gateway gateway)
         {
+            this.Gateway = gateway;
             this.messagingOptions = messagingOptions.Value;
             this.loggerFactory = loggerFactory;
             this.senderManager = senderManager;
@@ -57,10 +58,6 @@ namespace Orleans.Runtime.Messaging
             this.messageFactory = messageFactory;
             this.MyAddress = siloDetails.SiloAddress;
             this.Initialize(networkingOptions, statisticsOptions);
-            if (siloDetails.GatewayAddress != null)
-            {
-                Gateway = gatewayFactory(this);
-            }
 
             messageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
         }
@@ -80,12 +77,6 @@ namespace Orleans.Runtime.Messaging
         {
             IsBlockingApplicationMessages = false;
             OutboundQueue.Start();
-        }
-
-        public void StartGateway(ClientObserverRegistrar clientRegistrar)
-        {
-            if (Gateway != null)
-                Gateway.Start(clientRegistrar);
         }
 
         public void PrepareToStop()

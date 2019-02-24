@@ -93,7 +93,7 @@ namespace KestrelTestSilo
         public Task<string> SayHelloKestrel(string name)
         {
             //throw new InvalidOperationException("no no " + name);
-           // this.log.LogInformation($"Received a happy little message from {name} just now :)");
+           this.log.LogInformation($"Received a happy little message from {name} just now :)");
            return Task.FromResult($"Hello from Orleans on Kestrel, {name}!!!");
         }
     }

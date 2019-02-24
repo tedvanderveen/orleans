@@ -120,7 +120,8 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();
-            services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
+            services.TryAddSingleton<Gateway>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, Gateway>();
             services.TryAddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
@@ -276,8 +277,21 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
 
-            // Disable hosted client by default.
-            services.TryAddSingleton<IHostedClient, DisabledHostedClient>();
+            // Enable hosted client.
+            services.AddSingleton<HostedClient>();
+            services.AddFromExisting<IHostedClient, HostedClient>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, HostedClient>();
+            services.TryAddSingleton<InvokableObjectManager>();
+            services.TryAddSingleton<IClusterClient>(
+                sp =>
+                {
+                    var result = ActivatorUtilities.CreateInstance<ClusterClient>(sp);
+                    var task = result.Connect();
+                    if (!task.IsCompleted)
+                        throw new InvalidOperationException(
+                            $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
+                    return result;
+                });
 
             // Enable collection specific Age limits
             services.AddOptions<GrainCollectionOptions>()
@@ -309,6 +323,10 @@ namespace Orleans.Hosting
             services.TryAddTransient<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionComponentFactory, SiloConnectionComponentFactory>();
             services.TryAddSingleton<OutboundConnectionFactory, SiloOutboundConnectionFactory>();
+            services.TryAddSingleton<IdealMessageCenter>();
+            services.AddFromExisting<IMessageHandler, IdealMessageCenter>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IdealMessageCenter>();
+            services.TryAddSingleton<MessageTrace>();
 
             // Use Orleans socket server.
             services.AddSingleton<OrleansServer>();

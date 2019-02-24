@@ -48,14 +48,6 @@ namespace Orleans.Runtime
             this.logger = logger;
 
             this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
-
-            // Register with the directory and message center so that we can receive messages.
-            this.clientObserverRegistrar.SetHostedClient(this);
-            this.clientObserverRegistrar.ClientAdded(this.ClientId);
-            this.siloMessageCenter.SetHostedClient(this);
-
-            // Start pumping messages.
-            this.Start();
         }
 
         /// <inheritdoc />
@@ -206,7 +198,7 @@ namespace Orleans.Runtime
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeServices, OnStart, OnStop);
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.BecomeActive, OnStart, OnStop);
 
             Task OnStart(CancellationToken cancellation)
             {

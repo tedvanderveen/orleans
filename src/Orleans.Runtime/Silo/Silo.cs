@@ -505,14 +505,6 @@ namespace Orleans.Runtime
         private async Task OnBecomeActiveStart(CancellationToken ct)
         {
             var stopWatch = Stopwatch.StartNew();
-            StartTaskWithPerfAnalysis("Start gateway", StartGateway, stopWatch);
-            void StartGateway()
-            {
-                // Now that we're active, we can start the gateway
-                var mc = this.messageCenter as MessageCenter;
-                mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
-                logger.Debug("Message gateway service started successfully.");
-            }
 
             await StartAsyncTaskWithPerfAnalysis("Starting local silo status oracle", BecomeActive, stopWatch);
             async Task BecomeActive()

@@ -7,7 +7,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class GatewayMessageReceiver : ConnectionMessageReceiver
     {
-        private readonly MessageCenter messageCenter;
+        private readonly IdealMessageCenter messageCenter;
         private readonly ILocalSiloDetails siloDetails;
         private readonly MultiClusterOptions multiClusterOptions;
         private readonly CounterStatistic loadSheddingCounter;
@@ -15,16 +15,18 @@ namespace Orleans.Runtime.Messaging
         private readonly OverloadDetector overloadDetector;
         private readonly MessageFactory messageFactory;
         private readonly ILogger<GatewayMessageReceiver> log;
+        private readonly Gateway gateway;
 
         public GatewayMessageReceiver(
             ConnectionContext connection,
             IMessageSerializer serializer,
-            MessageCenter messageCenter,
+            IdealMessageCenter messageCenter,
             ILocalSiloDetails siloDetails,
             OverloadDetector overloadDetector,
             IOptions<MultiClusterOptions> multiClusterOptions,
             MessageFactory messageFactory,
-            ILogger<GatewayMessageReceiver> log)
+            ILogger<GatewayMessageReceiver> log,
+            Gateway gateway)
             : base(connection, serializer)
         {
             this.messageCenter = messageCenter;
@@ -32,12 +34,11 @@ namespace Orleans.Runtime.Messaging
             this.overloadDetector = overloadDetector;
             this.messageFactory = messageFactory;
             this.log = log;
+            this.gateway = gateway;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
         }
-
-        private Gateway Gateway => this.messageCenter.Gateway;
 
         protected override void OnReceivedMessage(Message msg)
         {
@@ -61,37 +62,15 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message rejection = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
-                this.messageCenter.TryDeliverToProxy(rejection);
+                this.messageCenter.HandleMessage(rejection);
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
                 loadSheddingCounter.Increment();
                 return;
             }
 
-            SiloAddress targetAddress = Gateway.TryToReroute(msg);
-            msg.SendingSilo = this.messageCenter.MyAddress;
+            msg.SendingSilo = this.siloDetails.SiloAddress;
 
-            if (targetAddress == null)
-            {
-                // reroute via Dispatcher
-                msg.TargetSilo = null;
-                msg.TargetActivation = null;
-                msg.ClearTargetAddress();
-
-                if (msg.TargetGrain.IsSystemTarget)
-                {
-                    msg.TargetSilo = this.messageCenter.MyAddress;
-                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, this.messageCenter.MyAddress);
-                }
-
-                MessagingStatisticsGroup.OnMessageReRoute(msg);
-                this.messageCenter.RerouteMessage(msg);
-            }
-            else
-            {
-                // send directly
-                msg.TargetSilo = targetAddress;
-                this.messageCenter.SendMessage(msg);
-            }
+            this.messageCenter.HandleMessage(msg);
         }
     }
 }

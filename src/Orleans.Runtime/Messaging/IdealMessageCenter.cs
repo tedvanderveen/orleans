@@ -14,19 +14,9 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageTrace
-    {
-        public void OnHandleMessage(Message message) { }
-
-        internal void OnDropMessage(Message message, string reason) { }
-
-        internal void OnRejectMessage(Message message, string reason) { }
-
-        internal void OnInboundPing(Message message) { }
-    }
-
     internal sealed class IdealMessageCenter : IMessageHandler, ILifecycleParticipant<ISiloLifecycle>
     {
+        private readonly IServiceProvider serviceProvider;
         private OrleansTaskScheduler scheduler;
         private ILocalGrainDirectory localDirectory;
         private ActivationDirectory activationDirectory;
@@ -40,7 +30,6 @@ namespace Orleans.Runtime.Messaging
         private ConnectionManager connectionManager;
         private ISiloStatusOracle siloStatusOracle;
         private IHostedClient hostedClient;
-        private IServiceProvider serviceProvider;
         private bool isBlockingApplicationMessages;
 
         public IdealMessageCenter(IServiceProvider serviceProvider)
@@ -383,11 +372,17 @@ namespace Orleans.Runtime.Messaging
         {
             lifecycle.Subscribe(
                 "MessageCenter",
+                ServiceLifecycleStage.First,
+                OnFirst,
+                _ => Task.CompletedTask);
+
+            lifecycle.Subscribe(
+                "MessageCenter",
                 ServiceLifecycleStage.RuntimeInitialize,
                 OnRuntimeInitializeStart,
                 OnRuntimeInitializeStop);
 
-            Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
+            Task OnFirst(CancellationToken cancellationToken)
             {
                 this.localSiloAddress = this.serviceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress;
                 this.hostedClient = this.serviceProvider.GetRequiredService<HostedClient>();
@@ -402,6 +397,11 @@ namespace Orleans.Runtime.Messaging
                 this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
                 this.siloStatusOracle = this.serviceProvider.GetRequiredService<ISiloStatusOracle>();
                 this.messagingOptions = this.serviceProvider.GetRequiredService<IOptions<SiloMessagingOptions>>().Value;
+                return Task.CompletedTask;
+            }
+
+            Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
+            {
                 this.isBlockingApplicationMessages = false;
                 return Task.CompletedTask;
             }

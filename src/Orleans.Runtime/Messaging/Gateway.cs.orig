@@ -9,14 +9,12 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Microsoft.AspNetCore.Connections;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Messaging
 {
     internal class Gateway : ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly IServiceProvider serviceProvider;
-        private readonly IdealMessageCenter messageCenter;
+        private readonly MessageCenter messageCenter;
         private readonly GatewayClientCleanupAgent dropper;
 
         // clients is the main authorative collection of all connected clients. 
@@ -36,8 +34,7 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloMessagingOptions messagingOptions;
         
         public Gateway(
-            IServiceProvider serviceProvider,
-            IdealMessageCenter msgCtr, 
+            MessageCenter msgCtr, 
             ILocalSiloDetails siloDetails, 
             MessageFactory messageFactory,
             ExecutorService executorService, 
@@ -46,7 +43,6 @@ namespace Orleans.Runtime.Messaging
         {
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
-            this.serviceProvider = serviceProvider;
             messageCenter = msgCtr;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             dropper = new GatewayClientCleanupAgent(this, executorService, loggerFactory, messagingOptions.ClientDropTimeout);
@@ -58,9 +54,9 @@ namespace Orleans.Runtime.Messaging
             lockable = new object();
         }
 
-        internal void Start()
+        internal void Start(ClientObserverRegistrar clientRegistrar)
         {
-            this.clientRegistrar = this.serviceProvider.GetRequiredService<ClientObserverRegistrar>();
+            this.clientRegistrar = clientRegistrar;
             this.clientRegistrar.SetGateway(this);
             dropper.Start();
         }
@@ -366,16 +362,12 @@ namespace Orleans.Runtime.Messaging
         private sealed class GatewaySender
         {
             private readonly Gateway gateway;
-            private readonly IdealMessageCenter messageCenter;
+            private readonly MessageCenter messageCenter;
             private readonly MessageFactory messageFactory;
             private readonly ILogger<GatewaySender> log;
             private readonly CounterStatistic gatewaySends;
 
-            internal GatewaySender(
-                Gateway gateway,
-                IdealMessageCenter messageCenter,
-                MessageFactory messageFactory,
-                ILogger<GatewaySender> log)
+            internal GatewaySender(Gateway gateway, MessageCenter messageCenter, MessageFactory messageFactory, ILogger<GatewaySender> log)
             {
                 this.gateway = gateway;
                 this.messageCenter = messageCenter;
@@ -401,7 +393,7 @@ namespace Orleans.Runtime.Messaging
                             msg,
                             Message.RejectionTypes.Unrecoverable,
                             "Unknown client " + msg.TargetGrain);
-                        messageCenter.HandleMessage(error);
+                        messageCenter.SendMessage(error);
                     }
                     else
                     {
@@ -502,8 +494,12 @@ namespace Orleans.Runtime.Messaging
 
                 if (msg.Direction == Message.Directions.Request)
                 {
+<<<<<<< ours
+                    this.gateway.messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
+=======
                     var rejection = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Unable to serialize message", exc);
                     this.messageCenter.HandleMessage(rejection);
+>>>>>>> theirs
                 }
                 else if (msg.Direction == Message.Directions.Response && retryCount < 1)
                 {
@@ -512,7 +508,7 @@ namespace Orleans.Runtime.Messaging
                     msg.Result = Message.ResponseTypes.Error;
                     msg.BodyObject = Response.ExceptionResponse(exc);
                     msg.RetryCount = retryCount + 1;
-                    this.messageCenter.HandleMessage(msg);
+                    this.gateway.messageCenter.SendMessage(msg);
                 }
                 else
                 {

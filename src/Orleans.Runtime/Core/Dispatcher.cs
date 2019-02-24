@@ -31,7 +31,6 @@ namespace Orleans.Runtime
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
-        private readonly InsideRuntimeClient runtimeClient;
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
             MessageCenter messageCenter, 
@@ -47,8 +46,7 @@ namespace Orleans.Runtime
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
-            this.MessageCenter = messageCenter;
-            this.runtimeClient = catalog.RuntimeClient;
+            MessageCenter = messageCenter;
             this.messagingOptions = messagingOptions.Value;
             this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
@@ -59,6 +57,8 @@ namespace Orleans.Runtime
             this.schedulingOptions = schedulerOptions.Value;
             logger = loggerFactory.CreateLogger<Dispatcher>();
         }
+
+        private InsideRuntimeClient RuntimeClient => this.catalog.RuntimeClient;
 
         /// <summary>
         /// Receive a new message:
@@ -413,7 +413,7 @@ namespace Orleans.Runtime
                 targetActivation.RecordRunning(message, message.IsAlwaysInterleave);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.runtimeClient, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
+                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.RuntimeClient, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
             }
         }
 
