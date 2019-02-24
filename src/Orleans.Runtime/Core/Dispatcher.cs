@@ -18,7 +18,7 @@ namespace Orleans.Runtime
 {
     internal class Dispatcher
     {
-        internal MessageCenter MessageCenter { get; }
+        internal IdealMessageCenter MessageCenter { get; }
 
         private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
@@ -31,9 +31,11 @@ namespace Orleans.Runtime
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
+        private readonly SiloAddress localSiloAddress;
+
         internal Dispatcher(
-            OrleansTaskScheduler scheduler, 
-            MessageCenter messageCenter, 
+            OrleansTaskScheduler scheduler,
+            IdealMessageCenter messageCenter, 
             Catalog catalog,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementDirectorsManager placementDirectorsManager,
@@ -42,8 +44,10 @@ namespace Orleans.Runtime
             MessageFactory messageFactory,
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory,
-            IOptions<SchedulingOptions> schedulerOptions)
+            IOptions<SchedulingOptions> schedulerOptions,
+            ILocalSiloDetails localSiloDetails)
         {
+            this.localSiloAddress = localSiloDetails.SiloAddress;
             this.scheduler = scheduler;
             this.catalog = catalog;
             MessageCenter = messageCenter;
@@ -220,7 +224,7 @@ namespace Orleans.Runtime
         {
             if (rejection.Result == Message.ResponseTypes.Rejection)
             {
-                MessageCenter.SendMessage(rejection);
+                MessageCenter.HandleMessage(rejection);
             }
             else
             {
@@ -241,7 +245,6 @@ namespace Orleans.Runtime
                     return;
                 }
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                if (MessageCenter.TryDeliverToProxy(message)) return;
 
                this.catalog.RuntimeClient.ReceiveResponse(message);
             }
@@ -615,7 +618,7 @@ namespace Orleans.Runtime
             {
                 message.TargetAddress = forwardingAddress;
                 message.IsNewPlacement = false;
-                this.MessageCenter.SendMessage(message);
+                this.MessageCenter.HandleMessage(message);
             }
             else
             {
@@ -790,7 +793,7 @@ namespace Orleans.Runtime
 
             if (message.TargetSilo == null)
             {
-                message.TargetSilo = MessageCenter.MyAddress;
+                message.TargetSilo = this.localSiloAddress;
             }
             if (message.TargetActivation == null)
             {
@@ -809,7 +812,7 @@ namespace Orleans.Runtime
         {
             MarkSameCallChainMessageAsInterleaving(sendingActivation, message);
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_Send_AddressedMessage, "Addressed message {0}", message);
-            MessageCenter.SendMessage(message);
+            MessageCenter.HandleMessage(message);
         }
 
         /// <summary>

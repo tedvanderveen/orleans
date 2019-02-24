@@ -51,7 +51,10 @@ namespace KestrelTestSilo
                     })
                     .EnableDirectClient();
                 })
-                .ConfigureLogging(logging => logging.AddConsole())
+                .ConfigureLogging(logging =>
+                {
+                    logging.AddConsole();
+                })
                 .UseConsoleLifetime()
                 .Build();
 

@@ -593,7 +593,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
-                    this.Dispatcher.MessageCenter.SendMessage(message);
+                    this.Dispatcher.MessageCenter.HandleMessage(message);
                     return;
                 }
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -13,22 +13,22 @@ namespace Orleans.Runtime.Messaging
 
         public void OnHandleMessage(Message message)
         {
-            if (this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation("Handling Message {Message}", message);
+            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Handling Message {Message}", message);
         }
 
         internal void OnDropMessage(Message message, string reason)
         {
-            if (this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation("Dropping Message {Message}. Reason: {Reason}", message, reason);
+            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Dropping Message {Message}. Reason: {Reason}", message, reason);
         }
 
         internal void OnRejectMessage(Message message, string reason)
         {
-            if (this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation("Rejecting Message {Message}. Reason: {Reason}", message, reason);
+            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Rejecting Message {Message}. Reason: {Reason}", message, reason);
         }
 
         internal void OnInboundPing(Message message)
         {
-            if (this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation("Received ping message {Message}", message);
+            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Received ping message {Message}", message);
         }
     }
 }

@@ -56,7 +56,7 @@ namespace Orleans.Runtime.Messaging
             // If destination silo is not specified, reject
             if (message.TargetSilo == null)
             {
-                this.SendRejectionMessage(message, "No target silo provided.");
+                this.dispatcher.RerouteMessage(message);
                 return;
             }
 
@@ -105,8 +105,8 @@ namespace Orleans.Runtime.Messaging
             switch (message.Category)
             {
                 case Message.Categories.Ping:
-                    this.HandleInboundPingMessage(message);
-                    return;
+                    if (this.TryHandleInboundPingMessage(message)) return;
+                    goto case Message.Categories.System;
                 case Message.Categories.Application:
                 case Message.Categories.System:
                     this.HandleInboundMessage(message);
@@ -118,12 +118,47 @@ namespace Orleans.Runtime.Messaging
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private void HandleInboundPingMessage(Message message)
+        private bool TryHandleInboundPingMessage(Message message)
         {
+            var msg = message;
+            // See it's a Ping message, and if so, short-circuit it
+            object pingObj;
+            var requestContext = msg.RequestContextData;
+            if (requestContext != null &&
+                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out pingObj) &&
+                pingObj is bool &&
+                (bool)pingObj)
+            {
+                MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
+
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Responding to Ping from {0}", msg.SendingSilo);
+
+                if (!msg.TargetSilo.Equals(this.localSiloAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
+                {
+                    MessagingStatisticsGroup.OnRejectedMessage(msg);
+                    Message rejection = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
+                        $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {this.localSiloAddress.ToLongString()}. " +
+                        $"The rejected ping message is {msg}.");
+                    this.SendMessageToRemoteSilo(rejection);
+                }
+                else
+                {
+                    var response = this.messageFactory.CreateResponseMessage(msg);
+                    response.BodyObject = Response.Done;
+                    this.SendMessageToRemoteSilo(response);
+                }
+
+                return true;
+            }
+
+            return false;
+            /*
+            if (message.Direction == Message.Directions.Response) return;
             this.trace.OnInboundPing(message);
             var response = this.messageFactory.CreateResponseMessage(message);
             response.BodyObject = Response.Done;
             this.SendMessageToRemoteSilo(response);
+            */
         }
 
         private void HandleInboundMessage(Message message)
@@ -193,7 +228,7 @@ namespace Orleans.Runtime.Messaging
 
         private void HandleInboundMessageToClient(Message message)
         {
-            if (!this.gateway.TryDeliverToProxy(message) && hostedClient == null || !hostedClient.TryDispatchToClient(message))
+            if (!this.gateway.TryDeliverToProxy(message) && (hostedClient == null || !hostedClient.TryDispatchToClient(message)))
             {
                 this.DropMessageToUnknownClient(message);
             }

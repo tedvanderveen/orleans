@@ -103,7 +103,7 @@ namespace Orleans.Runtime
             ActivationDirectory activationDirectory,
             ActivationCollector activationCollector,
             GrainCreator grainCreator,
-            MessageCenter messageCenter,
+            IdealMessageCenter messageCenter,
             PlacementDirectorsManager placementDirectorsManager,
             MessageFactory messageFactory,
             IStreamProviderRuntime providerRuntime,
@@ -113,7 +113,7 @@ namespace Orleans.Runtime
             IOptions<SchedulingOptions> schedulingOptions,
             IOptions<GrainCollectionOptions> collectionOptions,
             IOptions<SiloMessagingOptions> messagingOptions)
-            : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
+            : base(Constants.CatalogId, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
             this.localSiloName = localSiloDetails.Name;
@@ -143,7 +143,8 @@ namespace Orleans.Runtime
                 messageFactory,
                 versionSelectorManager.CompatibilityDirectorManager,
                 loggerFactory,
-                schedulingOptions);
+                schedulingOptions,
+                localSiloDetails);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
 // TODO: figure out how to read config change notification from options. - jbragg

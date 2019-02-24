@@ -69,6 +69,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             msg.SendingSilo = this.siloDetails.SiloAddress;
+            msg.TargetSilo = null;
 
             this.messageCenter.HandleMessage(msg);
         }
