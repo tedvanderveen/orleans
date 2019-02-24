@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -26,50 +27,25 @@ namespace Orleans.Runtime.Messaging
 
     internal sealed class IdealMessageCenter : IMessageHandler, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly OrleansTaskScheduler scheduler;
-        private readonly ILocalGrainDirectory localDirectory;
-        private readonly ActivationDirectory activationDirectory;
-        private readonly ILogger<IdealMessageCenter> logger;
-        private readonly SiloAddress localSiloAddress;
-        private readonly MessageTrace trace;
-        private readonly SiloMessagingOptions messagingOptions;
-        private readonly MessageFactory messageFactory;
-        private readonly Dispatcher dispatcher;
-        private readonly Gateway gateway;
-        private readonly ConnectionManager connectionManager;
-        private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly IHostedClient hostedClient;
-
+        private OrleansTaskScheduler scheduler;
+        private ILocalGrainDirectory localDirectory;
+        private ActivationDirectory activationDirectory;
+        private ILogger<IdealMessageCenter> logger;
+        private SiloAddress localSiloAddress;
+        private MessageTrace trace;
+        private SiloMessagingOptions messagingOptions;
+        private MessageFactory messageFactory;
+        private Dispatcher dispatcher;
+        private Gateway gateway;
+        private ConnectionManager connectionManager;
+        private ISiloStatusOracle siloStatusOracle;
+        private IHostedClient hostedClient;
+        private IServiceProvider serviceProvider;
         private bool isBlockingApplicationMessages;
 
-        public IdealMessageCenter(
-            OrleansTaskScheduler scheduler,
-            ILocalGrainDirectory localDirectory,
-            ActivationDirectory activationDirectory,
-            ILogger<IdealMessageCenter> logger,
-            ILocalSiloDetails localSiloDetails,
-            MessageTrace messageTrace,
-            IOptions<SiloMessagingOptions> siloMessagingOptions,
-            MessageFactory messageFactory,
-            Dispatcher dispatcher,
-            Gateway gateway,
-            ConnectionManager connectionManager,
-            ISiloStatusOracle siloStatusOracle,
-            IEnumerable<HostedClient> hostedClient)
+        public IdealMessageCenter(IServiceProvider serviceProvider)
         {
-            this.localSiloAddress = localSiloDetails.SiloAddress;
-            this.hostedClient = hostedClient.FirstOrDefault();
-            this.scheduler = scheduler;
-            this.localDirectory = localDirectory;
-            this.activationDirectory = activationDirectory;
-            this.logger = logger;
-            this.trace = messageTrace;
-            this.messageFactory = messageFactory;
-            this.dispatcher = dispatcher;
-            this.gateway = gateway;
-            this.connectionManager = connectionManager;
-            this.siloStatusOracle = siloStatusOracle;
-            this.messagingOptions = siloMessagingOptions.Value;
+            this.serviceProvider = serviceProvider;
         }
 
         /// <summary>
@@ -413,6 +389,19 @@ namespace Orleans.Runtime.Messaging
 
             Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
             {
+                this.localSiloAddress = this.serviceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress;
+                this.hostedClient = this.serviceProvider.GetRequiredService<HostedClient>();
+                this.scheduler = this.serviceProvider.GetRequiredService<OrleansTaskScheduler>();
+                this.localDirectory = this.serviceProvider.GetRequiredService<ILocalGrainDirectory>();
+                this.activationDirectory = this.serviceProvider.GetRequiredService<ActivationDirectory>();
+                this.logger = this.serviceProvider.GetRequiredService<ILogger<IdealMessageCenter>>();
+                this.trace = this.serviceProvider.GetRequiredService<MessageTrace>();
+                this.messageFactory = this.serviceProvider.GetRequiredService<MessageFactory>();
+                this.dispatcher = this.serviceProvider.GetRequiredService<Dispatcher>();
+                this.gateway = this.serviceProvider.GetRequiredService<Gateway>();
+                this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
+                this.siloStatusOracle = this.serviceProvider.GetRequiredService<ISiloStatusOracle>();
+                this.messagingOptions = this.serviceProvider.GetRequiredService<IOptions<SiloMessagingOptions>>().Value;
                 this.isBlockingApplicationMessages = false;
                 return Task.CompletedTask;
             }
