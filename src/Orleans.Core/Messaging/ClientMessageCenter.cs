@@ -124,7 +124,7 @@ namespace Orleans.Messaging
             {
                 SingleReader = true,
                 SingleWriter = false,
-                AllowSynchronousContinuations = true
+                AllowSynchronousContinuations = false
             });
             numMessages = 0;
             grainBuckets = new WeakReference<ConnectionMessageSender>[clientMessagingOptions.Value.ClientSenderBuckets];

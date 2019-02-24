@@ -564,7 +564,7 @@ namespace Orleans.Runtime.Messaging
             return segment;
         }
 
-        private class SequenceSegment : ReadOnlySequenceSegment<T>
+        private sealed class SequenceSegment : ReadOnlySequenceSegment<T>
         {
             /// <summary>
             /// Backing field for the <see cref="End"/> property.

@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Messaging
     internal class SocketConnectionFactory : IConnectionFactory
     {
         private readonly SocketsTrace trace;
+        private readonly PipeScheduler scheduler = PipeScheduler.ThreadPool;
 
         public SocketConnectionFactory(ILoggerFactory loggerFactory)
         {
@@ -47,7 +48,7 @@ namespace Orleans.Runtime.Messaging
                 throw new Exception($"Unable to connect to {endPoint}. Error: {completion.SocketError}");
             }
 
-            var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.ThreadPool, this.trace);
+            var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, this.scheduler, this.trace);
             var pair = DuplexPipe.CreateConnectionPair(GetPipeOptions(PipeScheduler.Inline, connection.InputWriterScheduler), GetPipeOptions(connection.OutputReaderScheduler, PipeScheduler.Inline));
             connection.Application = pair.Application;
             connection.Transport = pair.Transport;

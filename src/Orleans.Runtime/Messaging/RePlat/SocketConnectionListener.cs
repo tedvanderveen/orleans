@@ -122,21 +122,22 @@ namespace Orleans.Runtime.Messaging.RePlat
             {
                 while (true)
                 {
-                        try
-                        {
-                            var acceptSocket = await this.listenSocket.AcceptAsync();
-                            acceptSocket.NoDelay = true;
+                    try
+                    {
+                        var acceptSocket = await this.listenSocket.AcceptAsync();
+                        acceptSocket.NoDelay = true;
+                        SocketConnectionFactory.SetRecommendedClientOptions(acceptSocket);
 
-                            var connection = new SocketConnection(acceptSocket, this.memoryPool, this.scheduler, this.trace);
+                        var connection = new SocketConnection(acceptSocket, this.memoryPool, this.scheduler, this.trace);
 
-                            // REVIEW: This task should be tracked by the server for graceful shutdown
-                            // Today it's handled specifically for http but not for arbitrary middleware
-                            _ = this.HandleConnectionAsync(connection);
-                        }
-                        catch (SocketException) when (!this.unbinding)
-                        {
-                            this.trace.ConnectionReset(connectionId: "(null)");
-                        }
+                        // REVIEW: This task should be tracked by the server for graceful shutdown
+                        // Today it's handled specifically for http but not for arbitrary middleware
+                        _ = this.HandleConnectionAsync(connection);
+                    }
+                    catch (SocketException) when (!this.unbinding)
+                    {
+                        this.trace.ConnectionReset(connectionId: "(null)");
+                    }
                 }
             }
             catch (Exception ex)
@@ -152,7 +153,7 @@ namespace Orleans.Runtime.Messaging.RePlat
 
                     // Request shutdown so we can rethrow this exception
                     // in Stop which should be observable.
-                   // this.applicationLifetime.StopApplication();
+                    // this.applicationLifetime.StopApplication();
                 }
             }
         }
