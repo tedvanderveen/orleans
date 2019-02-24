@@ -19,7 +19,7 @@ namespace Benchmarks.Ping
     public class KestrelSequentialPingBenchmark : IDisposable 
     {
         private readonly IHost host;
-        //private readonly IHost two;
+        private readonly IHost two;
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
 
@@ -29,7 +29,7 @@ namespace Benchmarks.Ping
             var primary = new IPEndPoint(IPAddress.Loopback, 60666);
             this.host = CreateSilo(primary, 0).GetAwaiter().GetResult();
             Console.WriteLine("silo started");
-            //this.two = CreateSilo(primary, 1).GetAwaiter().GetResult();
+            this.two = CreateSilo(primary, 1).GetAwaiter().GetResult();
 
             /*
             this.client = new ClientBuilder()
@@ -41,14 +41,13 @@ namespace Benchmarks.Ping
             this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
             */
             
-            this.client = host.Services.GetRequiredService<IClusterClient>();
+            this.client = two.Services.GetRequiredService<IClusterClient>();
             int siloPort;
             do
             {
                 this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
                 siloPort = this.grain.GetSiloPort().GetAwaiter().GetResult();
             } while (siloPort != 60666);
-           
         }
 
         private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)
@@ -154,7 +153,7 @@ namespace Benchmarks.Ping
         {
             //this.client.Dispose();
             this.host.Dispose();
-            //this.two.Dispose();
+            this.two.Dispose();
         }
 
 /*        public class Startup

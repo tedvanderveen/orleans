@@ -15,6 +15,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly OrleansSerializer<Message.HeadersContainer> messageHeadersSerializer;
         private readonly OrleansSerializer<object> objectSerializer;
+        private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
 
         public MessageSerializer(SerializationManager serializationManager)
         {
@@ -68,7 +69,7 @@ namespace Orleans.Runtime.Messaging
 
         public void Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
-            var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 10240);
+            var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 4096, this.memoryPool);
             this.messageHeadersSerializer.Serialize(ref buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
 
@@ -149,10 +150,12 @@ namespace Orleans.Runtime.Messaging
     /// </remarks>
     public class PrefixingBufferWriter<T, TBufferWriter> : IBufferWriter<T> where TBufferWriter : IBufferWriter<T>
     {
+        private readonly MemoryPool<T> memoryPool;
+
         /// <summary>
         /// The underlying buffer writer.
         /// </summary>
-        private readonly TBufferWriter innerWriter;
+        private TBufferWriter innerWriter;
 
         /// <summary>
         /// The length of the header.
@@ -193,17 +196,22 @@ namespace Orleans.Runtime.Messaging
         /// <param name="innerWriter">The underlying writer that should ultimately receive the prefix and payload.</param>
         /// <param name="prefixSize">The length of the header to reserve space for. Must be a positive number.</param>
         /// <param name="payloadSizeHint">A hint at the expected max size of the payload. The real size may be more or less than this, but additional copying is avoided if it does not exceed this amount. If 0, a reasonable guess is made.</param>
-        public PrefixingBufferWriter(TBufferWriter innerWriter, int prefixSize, int payloadSizeHint)
+        /// <param name="memoryPool"></param>
+        public PrefixingBufferWriter(TBufferWriter innerWriter, int prefixSize, int payloadSizeHint, MemoryPool<T> memoryPool = null)
         {
             if (prefixSize <= 0)
             {
                 ThrowPrefixSize();
             }
 
+            this.memoryPool = memoryPool ?? MemoryPool<T>.Shared;
             this.innerWriter = innerWriter;
 
-            // TODO: clean up this equals
+#if NETCOREAPP
+            if (innerWriter is null) ThrowInnerWriter();
+#else
             if (innerWriter.Equals(default(TBufferWriter))) ThrowInnerWriter();
+#endif
             this.expectedPrefixSize = prefixSize;
             this.payloadSizeHint = payloadSizeHint;
 
@@ -237,7 +245,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.privateWriter == null)
                 {
-                    this.privateWriter = new Sequence<T>();
+                    this.privateWriter = new Sequence<T>(this.memoryPool);
                 }
 
                 return this.privateWriter.GetMemory(sizeHint);
@@ -257,7 +265,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.privateWriter == null)
                 {
-                    this.privateWriter = new Sequence<T>();
+                    this.privateWriter = new Sequence<T>(this.memoryPool);
                 }
 
                 return this.privateWriter.GetSpan(sizeHint);
