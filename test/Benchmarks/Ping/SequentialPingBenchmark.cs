@@ -44,7 +44,8 @@ namespace Benchmarks.Ping
             this.echoGrain = this.client.GetGrain<IEchoGrain>(Guid.NewGuid().GetHashCode());
             this.echoGrain.Echo(0).GetAwaiter().GetResult();
             this.newEchoGrain = this.client.GetGrain<INewEchoGrain>(Guid.NewGuid().GetHashCode());
-            this.newEchoGrain.Echo(0).GetAwaiter().GetResult();
+            var echoTask = this.newEchoGrain.Echo(0);
+            echoTask.GetAwaiter().GetResult();
             Console.WriteLine("Init complete");
         }
 
