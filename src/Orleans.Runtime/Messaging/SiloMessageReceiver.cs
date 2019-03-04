@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.ExceptionServices;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 
@@ -106,6 +107,27 @@ namespace Orleans.Runtime.Messaging
                 if (log.IsEnabled(LogLevel.Debug)) log.Debug("Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
                     msg.TargetSilo.ToLongString(), messageCenter.MyAddress.ToLongString(), msg);
             }
+        }
+
+        protected override void OnReceiveMessageFail(Message message, Exception exception)
+        {
+            var msg = message;
+            // If deserialization completely failed or the message was one-way, rethrow the exception
+            // so that it can be handled at another level.
+            if (msg?.Headers == null || msg.Direction != Message.Directions.Request)
+            {
+                ExceptionDispatchInfo.Capture(exception).Throw();
+            }
+
+            // The message body was not successfully decoded, but the headers were.
+            // Send a fast fail to the caller.
+            MessagingStatisticsGroup.OnRejectedMessage(msg);
+            var response = this.messageFactory.CreateResponseMessage(msg);
+            response.Result = Message.ResponseTypes.Error;
+            response.BodyObject = Response.ExceptionResponse(exception);
+
+            // Send the error response and continue processing the next message.
+            this.messageCenter.SendMessage(response);
         }
     }
 }

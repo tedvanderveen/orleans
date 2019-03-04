@@ -55,6 +55,7 @@ namespace Orleans.Runtime.Messaging
                 this.RerouteMessage(message);
             }
         }
+
         private async Task Process()
         {
             var output = this.connection.Transport.Output;
@@ -70,9 +71,17 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
-                    if (reader.TryRead(out var message))
+                    Message message = default;
+                    try
                     {
-                        this.serializer.Write(ref output, message);
+                        if (reader.TryRead(out message))
+                        {
+                            this.serializer.Write(ref output, message);
+                        }
+                    }
+                    catch (Exception exception) when (message != default)
+                    {
+                        this.messageCenter.OnMessageSerializationFailure(message, exception);
                     }
 
                     var flushTask = output.FlushAsync();

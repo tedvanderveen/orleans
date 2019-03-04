@@ -7,15 +7,16 @@ namespace Orleans.Runtime.Messaging
 {
     internal abstract class ConnectionMessageReceiver
     {
-        private readonly ConnectionContext connection;
         private readonly IMessageSerializer serializer;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
 
         protected ConnectionMessageReceiver(ConnectionContext connection, IMessageSerializer serializer)
         {
-            this.connection = connection;
+            this.Connection = connection;
             this.serializer = serializer;
         }
+
+        protected ConnectionContext Connection { get; }
 
         public void Abort()
         {
@@ -26,13 +27,16 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void OnReceivedMessage(Message message);
 
+        protected abstract void OnReceiveMessageFail(Message message, Exception exception);
+
         private async Task Process()
         {
-            var input = this.connection.Transport.Input;
+            var input = this.Connection.Transport.Input;
             var error = default(Exception);
             try
             {
                 var requiredBytes = 0;
+                Message message = default;
                 while (!this.cancellation.IsCancellationRequested)
                 {
                     var readResultTask = input.ReadAsync(this.cancellation.Token);
@@ -44,10 +48,17 @@ namespace Orleans.Runtime.Messaging
                     {
                         do
                         {
-                            requiredBytes = this.serializer.TryRead(ref buffer, out var message);
-                            if (requiredBytes == 0)
+                            try
                             {
-                                this.OnReceivedMessage(message);
+                                requiredBytes = this.serializer.TryRead(ref buffer, out message);
+                                if (requiredBytes == 0)
+                                {
+                                    this.OnReceivedMessage(message);
+                                }
+                            }
+                            catch (Exception readException)
+                            {
+                                this.OnReceiveMessageFail(message, readException);
                             }
                         } while (requiredBytes == 0);
                     }
@@ -66,11 +77,11 @@ namespace Orleans.Runtime.Messaging
 
                 if (error != null)
                 {
-                    this.connection.Abort(new ConnectionAbortedException($"Exception in {nameof(ConnectionMessageReceiver)}, see {nameof(Exception.InnerException)}.", error));
+                    this.Connection.Abort(new ConnectionAbortedException($"Exception in {nameof(ConnectionMessageReceiver)}, see {nameof(Exception.InnerException)}.", error));
                 }
                 else
                 {
-                    this.connection.Abort();
+                    this.Connection.Abort();
                 }
             }
         }

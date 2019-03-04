@@ -22,9 +22,9 @@ namespace Orleans.Runtime.Messaging
 
         public int TryRead(ref ReadOnlySequence<byte> input, out Message message)
         {
+            message = default;
             if (input.Length < 8)
             {
-                message = default;
                 return 8;
             }
 
@@ -44,6 +44,13 @@ namespace Orleans.Runtime.Messaging
                 return requiredBytes;
             }
 
+            if (headerLength == 0)
+            {
+                input = input.Slice(requiredBytes);
+                message = default;
+                return requiredBytes;
+            }
+
             // decode header
             var header = input.Slice(Message.LENGTH_HEADER_SIZE, headerLength);
 
@@ -52,32 +59,42 @@ namespace Orleans.Runtime.Messaging
             var body = input.Slice(bodyOffset, bodyLength);
 
             // build message
-            this.messageHeadersSerializer.Deserialize(ref header, out var headersContainer);
-            message = new Message
+            try
             {
-                Headers = headersContainer
-            };
-            this.objectSerializer.Deserialize(ref body, out var bodyObject);
-            message.BodyObject = bodyObject;
+                this.messageHeadersSerializer.Deserialize(ref header, out var headersContainer);
+                message = new Message
+                {
+                    Headers = headersContainer
+                };
 
-            input = input.Slice(requiredBytes);
+                // Body deserialization is more likely to fail than header deserialization.
+                // Separating the two allows for these kinds of errors to be propagated back to the caller.
+                this.objectSerializer.Deserialize(ref body, out var bodyObject);
+                message.BodyObject = bodyObject;
+            }
+            finally
+            {
+                input = input.Slice(requiredBytes);
+            }
+
             return 0;
         }
 
         public void Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
             var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 10240);
+            Span<byte> lengthFields = stackalloc byte[8];
+
             this.messageHeadersSerializer.Serialize(ref buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
 
             this.objectSerializer.Serialize(ref buffer, message.BodyObject);
-            var bodyLength = buffer.CommittedBytes - headerLength;
 
             // Write length prefixes, first header length then body length.
-            Span<byte> lengthFields = stackalloc byte[8];
             BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerLength);
-            BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodyLength);
 
+            var bodyLength = buffer.CommittedBytes - headerLength;
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodyLength);
             buffer.Complete(lengthFields);
         }
 
@@ -126,10 +143,10 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     SerializationManager.SerializeInner(this.serializationManager, value, typeof(T), this.serializationContext, writer);
-                    writer.Commit();
                 }
                 finally
                 {
+                    writer.Commit();
                     this.serializationContext.Reset();
                 }
             }
@@ -298,6 +315,14 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
             }
+        }
+
+        public void PartialReset()
+        {
+            this.advanced = 0;
+            this.CommittedBytes = 0;
+            this.privateWriter?.Dispose();
+            this.privateWriter = null;
         }
 
         /// <summary>
