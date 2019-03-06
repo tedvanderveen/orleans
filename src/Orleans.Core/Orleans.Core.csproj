@@ -6,9 +6,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <DefineConstants>$(DefineConstants);SERIALIZER_SESSIONAWARE</DefineConstants>
+    <!--<DefineConstants>$(DefineConstants);SERIALIZER_SESSIONAWARE</DefineConstants>-->
   </PropertyGroup>
-  
+
   <PropertyGroup>
     <AssemblyName>Orleans.Core</AssemblyName>
     <RootNamespace>Orleans</RootNamespace>

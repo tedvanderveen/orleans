@@ -59,7 +59,7 @@ namespace Orleans.Runtime.Messaging
                             catch (Exception readException)
                             {
                                 this.OnReceiveMessageFail(message, readException);
-                                throw;
+                                //throw;
                             }
                         } while (requiredBytes == 0);
                     }
