@@ -1,15 +1,14 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO.Pipelines;
 using System.Net;
-using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
-using Orleans.Serialization;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -65,11 +64,12 @@ namespace UnitTests.Serialization
 
         private Message RoundTripMessage(Message message)
         {
-            var writer = new ArrayBufferWriter();
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var writer = pipe.Writer;
             this.messageSerializer.Write(ref writer, message);
-            
-            var data = writer.ToArray();
-            var reader = new ReadOnlySequence<byte>(data);
+
+            pipe.Reader.TryRead(out var readResult);
+            var reader = readResult.Buffer;
             Assert.Equal(0, this.messageSerializer.TryRead(ref reader, out var deserializedMessage));
             return deserializedMessage;
         }
