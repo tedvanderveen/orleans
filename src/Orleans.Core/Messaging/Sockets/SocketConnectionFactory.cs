@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-            socket.EnableRecommendedOptions();
+            socket.EnableFastPath();
             var completion = new SingleUseSocketAsyncEventArgs
             {
                 RemoteEndPoint = remoteEndPoint

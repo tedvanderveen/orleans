@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Messaging
         /// for more information.
         /// </summary>
         /// <param name="socket">The socket for which FastPath should be enabled.</param>
-        internal static void EnableRecommendedOptions(this Socket socket)
+        internal static void EnableFastPath(this Socket socket)
         {
             try { socket.NoDelay = true; } catch { }
 

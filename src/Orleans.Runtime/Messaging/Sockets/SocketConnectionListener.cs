@@ -54,7 +54,12 @@ namespace Orleans.Runtime.Messaging
             }
             
             var listenSocket = new Socket(this.endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            listenSocket.EnableRecommendedOptions();
+
+            // Prep the socket so it will reset on close
+            listenSocket.LingerState = new LingerOption(true, 0);
+            listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+
+            listenSocket.EnableFastPath();
 
             // Kestrel expects IPv6Any to bind to both IPv6 and IPv4
             if (this.endPoint.Address == IPAddress.IPv6Any)
@@ -124,7 +129,7 @@ namespace Orleans.Runtime.Messaging
                     try
                     {
                         var acceptSocket = await this.listenSocket.AcceptAsync();
-                        acceptSocket.EnableRecommendedOptions();
+                        acceptSocket.EnableFastPath();
 
                         var connection = new SocketConnection(acceptSocket, this.memoryPool, this.scheduler, this.trace);
 
